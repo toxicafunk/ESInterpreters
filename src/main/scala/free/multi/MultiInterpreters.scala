@@ -51,12 +51,13 @@ object MultiInterpreters extends App {
     override def apply[A](fa: HapromReportAlgebra[A]): Future[A] = fa match {
       case UpdateHapromProduct(id, product, offset) => {
         val provider = RestClient.callProvider(product.providerId).unsafeRunSync()
+
         val section = provider.sections
            .filter(section => section.section == product.categoryId)
            .head
 
         val updatedEvents: Iterable[Either[Error, Event[_]]] = product.subProducts.map(entry => {
-          val store = entry._2.platformId.map(p => RestClient.callStore(p).unsafeRunSync())
+          val store = entry._2.platformId.map(p => {println(p); RestClient.callStore(p).unsafeRunSync()})
           val id = entry._1 + product.ean.getOrElse("")
           HapromProductUpdated(id, product, store.map(_.tightFlowIndicator), section.hasLogisticMargin,
             Instant.now().toEpochMilli)
@@ -72,7 +73,7 @@ object MultiInterpreters extends App {
       }
 
       case UpdateHapromSale(id, subproduct, offset) => {
-        println("update product")
+        println("update subproduct")
         val store = subproduct.platformId.map(RestClient.callStore(_).unsafeRunSync())
         println(s"store: $store")
         val hsu = HapromSaleUpdated(id, subproduct, store.flatMap(_.logistic), Instant.now().toEpochMilli)
@@ -99,9 +100,5 @@ object MultiInterpreters extends App {
         .foldMap(futureMessagingOrReportInterpreter)
 
     result.filter(!_.isEmpty).foreach(s => println(s"message processed: $s"))
-
-    Thread.sleep(2000)
-    val log = futureReportsInterpreter.eventLog.eventLog
-    if (!log.isEmpty) println(log)
   }
 }

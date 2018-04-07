@@ -19,7 +19,7 @@ object RestClient {
   }
 
   def callStore[T](id: String): IO[Store] = {
-    val target = Uri.uri("http://localhost:9595/store/") / id
+    val target = Uri.uri("http://localhost:8080/store/") / id
     httpClient.flatMap(_.expect(target)(jsonOf[IO, Store]))
   }
 }

@@ -29,7 +29,6 @@ object Programs {
             Free.pure(Stream.Empty)
           }
           case Right(product) => {
-            println(product)
             repCtx.updateHapromProduct(product.id, product, 0)
               .map( eventStream => {
                 println(eventStream)
