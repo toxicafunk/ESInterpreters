@@ -4,9 +4,11 @@ import java.time.Instant
 
 import cats.implicits._
 import cats.~>
+
 import common.RestClient
 import common.models._
 import events._
+
 import free.multi.Algebras._
 import kafka.{Consumer, Producer}
 
@@ -61,6 +63,8 @@ object MultiInterpreters extends App {
         })
           .map(hpu => eventLog.put(hpu.id, hpu))
 
+        println(updatedEvents)
+
         Future.successful(updatedEvents.map {_ match {
           case Left(err) => HapromFailed(product.id, product, err, Instant.now().toEpochMilli)
           case Right(event) => event.asInstanceOf[HapromEvent[Product]]
@@ -68,7 +72,9 @@ object MultiInterpreters extends App {
       }
 
       case UpdateHapromSale(id, subproduct, offset) => {
+        println("update product")
         val store = subproduct.platformId.map(RestClient.callStore(_).unsafeRunSync())
+        println(s"store: $store")
         val hsu = HapromSaleUpdated(id, subproduct, store.flatMap(_.logistic), Instant.now().toEpochMilli)
         val updatedSales = eventLog.put(hsu.id, hsu)
         Future.successful {
@@ -88,14 +94,12 @@ object MultiInterpreters extends App {
   import Programs._
 
   while (true) {
-    val result: Future[Either[Unit, String]] =
+    val result: Future[Stream[String]] =
       processMessage("192.168.99.100:9092", "test", "testers", false)
         .foldMap(futureMessagingOrReportInterpreter)
 
-    result.foreach {
-      case Left(_) => ()
-      case Right(s) => println(s"message processed: $s")
-    }
+    result.filter(!_.isEmpty).foreach(s => println(s"message processed: $s"))
+
     Thread.sleep(2000)
     val log = futureReportsInterpreter.eventLog.eventLog
     if (!log.isEmpty) println(log)
