@@ -1,10 +1,9 @@
 package free.multi
 
 import cats.free.Free
-import free.multi.Algebras.{Messages, MessagingAndReportAlg, Reports}
 import common.models._
-import events.{HapromEvent, HapromProductUpdated}
-import io.circe._
+import events.HapromProductUpdated
+import free.multi.Algebras.{Messages, MessagingAndReportAlg, Reports}
 import io.circe.generic.auto._
 import io.circe.parser._
 import io.circe.syntax._
@@ -31,7 +30,6 @@ object Programs {
           case Right(product) => {
             repCtx.updateHapromProduct(product.id, product, 0)
               .map( eventStream => {
-                println(eventStream)
                 if (!autoCommit)
                   msgCtx.commit()
                 eventStream.map( event => {

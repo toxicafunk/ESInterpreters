@@ -24,7 +24,7 @@ object Interpreters extends App {
 
         consumerOpt match {
           case None => Future(Stream.empty)
-          case Some(c) => Future(c.atomicStream.getAndSet(Stream.Empty).map(record => record.value()))
+          case Some(c) => Future(c.atomicQueue.get().toStream.map(record => record.value()))
         }
       }
 

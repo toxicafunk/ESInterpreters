@@ -7,37 +7,43 @@ import java.util.{Collections, Properties}
 import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecord, ConsumerRecords, KafkaConsumer}
 
 import scala.collection.JavaConversions._
+import scala.collection.mutable.Queue
 
 class Consumer(val brokers: String,
                val topic: String,
                val groupId: String,
                val autoCommit: Boolean) {
 
-  val props = createConsumerConfig(brokers, groupId, autoCommit)
+  var executor: ExecutorService = Executors.newSingleThreadExecutor
+  val props: Properties = createConsumerConfig(brokers, groupId, autoCommit)
   val consumer = new KafkaConsumer[String, String](props)
-  val atomicStream: AtomicReference[Stream[ConsumerRecord[String, String]]] = new AtomicReference[Stream[ConsumerRecord[String, String]]](Stream.Empty)
-  var executor: ExecutorService = null
+  val atomicQueue: AtomicReference[Queue[ConsumerRecord[String, String]]] =
+    new AtomicReference[Queue[ConsumerRecord[String, String]]](Queue())
 
-  def run() = {
+
+  def run(): Unit = {
     consumer.subscribe(Collections.singletonList(topic))
 
-    Executors.newSingleThreadExecutor.execute(new Runnable {
+    executor.execute(new Runnable {
       override def run(): Unit = {
         println(s"Subscribed to topic $topic on ${Thread.currentThread().getId}")
         while (true) {
           val records: ConsumerRecords[String, String] = consumer poll 1000
-          if (!records.isEmpty) println(s"Received ${records.size} messages")
-          atomicStream.getAndUpdate(prev => prev.++(records.toStream))
+          if (!records.isEmpty) {
+            println(s"Received ${records.size} messages")
+            val q = atomicQueue.get
+            atomicQueue.set(q ++ records)
+          }
         }
       }
     })
   }
 
-  def shutdown() = {
+  def shutdown(): Unit = {
     if (consumer != null)
-      consumer.close();
+      consumer.close()
     if (executor != null)
-      executor.shutdown();
+      executor.shutdown()
   }
 
   def createConsumerConfig(brokers: String, groupId: String, autoCommit: Boolean): Properties = {
@@ -52,5 +58,5 @@ class Consumer(val brokers: String,
     props
   }
 
-  override def toString = s"Consumer(${atomicStream.get()}, $brokers, $topic, $groupId)"
+  override def toString = s"Consumer(${atomicQueue.get()}, $brokers, $topic, $groupId)"
 }

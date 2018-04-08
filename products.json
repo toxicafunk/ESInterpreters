@@ -1,0 +1,3 @@
+{"id":"P123","categoryId":"01", "ean": "890", "providerId": "PR100", "subProducts": { "SP000": {"id":"SP000", "platformId": "abc01" }}}
+{"id":"P234","categoryId":"01", "ean": "890", "providerId": "PR100", "subProducts": { "SP000": {"id":"SP000", "platformId": "abc01" }}}
+{"id":"P345","categoryId":"01", "ean": "890", "providerId": "PR100", "subProducts": { "SP000": {"id":"SP000", "platformId": "abc01" }}}
