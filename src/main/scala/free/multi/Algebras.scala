@@ -4,7 +4,7 @@ import cats.InjectK
 import cats.data.EitherK
 import cats.free.Free
 import common.models._
-import events.{HapromEvent, HapromProductUpdated, HapromSaleUpdated}
+import events.{OrderEvent, OrderCommerceItemUpdated, OrderPaymentGroupUpdated}
 
 object Algebras {
   type Message = String
@@ -29,27 +29,35 @@ object Algebras {
       new Messages
   }
 
-  sealed trait HapromReportAlgebra[+T]
-  case class UpdateHapromProduct(id: Id, entity: Product, offset: Int) extends HapromReportAlgebra[Stream[HapromEvent[Product]]]
-  case class UpdateHapromSale(id: Id, entity: SubProduct, offset: Int) extends HapromReportAlgebra[HapromEvent[SubProduct]]
-  case class Replay(id: Id, offset: Int, event: String) extends HapromReportAlgebra[Unit]
+  sealed trait OrdersAlgebra[+T]
+  case class CreateOrder(id: Id) extends OrdersAlgebra[Stream[OrderEvent[Order]]]
+  case class AddCommerceItem(id: Id, entity: Product, qty: Int) extends OrdersAlgebra[Stream[OrderEvent[Product]]]
+  case class AddPaymentGroup(id: Id, entity: PaymentMethod) extends OrdersAlgebra[OrderEvent[PaymentMethod]]
+  case class AddPaymentAdress(id: Id, entity: Address) extends OrdersAlgebra[OrderEvent[Address]]
+  case class Replay(id: Id, offset: Int, event: String) extends OrdersAlgebra[Unit]
 
-  class Reports[F[_]](implicit i: InjectK[HapromReportAlgebra, F]) {
-    def updateHapromProduct(id: Id, entity: Product, offset: Int): Free[F, Stream[HapromEvent[Product]]] =
-      Free.inject(UpdateHapromProduct(id, entity, offset))
+  class Orders[F[_]](implicit i: InjectK[OrdersAlgebra, F]) {
+    def createOrder(id: Id): Free[F, Stream[OrderEvent[Order]]] =
+      Free.inject(CreateOrder(id))
 
-    def updateHapromSale(id: Id, entity: SubProduct, offset: Int): Free[F, HapromEvent[SubProduct]] =
-      Free.inject(UpdateHapromSale(id, entity, offset))
+    def addCommerceItem(id: Id, entity: Product, qty: Int): Free[F, Stream[OrderEvent[Product]]] =
+      Free.inject(AddCommerceItem(id, entity, qty))
+
+    def addPaymentGroup(id: Id, entity: PaymentMethod): Free[F, OrderEvent[PaymentMethod]] =
+      Free.inject(AddPaymentGroup(id, entity))
+
+    def addPaymentAddress(id: Id, entity: Address): Free[F, OrderEvent[Address]] =
+      Free.inject(AddPaymentAdress(id, entity))
 
     def replay(id: Id, offset: Int, event: String): Free[F, Unit] =
       Free.inject(Replay(id, offset, event))
   }
-  object Reports {
-    implicit def reports[F[_]](implicit i: InjectK[HapromReportAlgebra, F]): Reports[F] =
-      new Reports
+  object Orders {
+    implicit def reports[F[_]](implicit i: InjectK[OrdersAlgebra, F]): Orders[F] =
+      new Orders
   }
 
-  type MessagingAndReportAlg[T] = EitherK[MessagingAlgebra, HapromReportAlgebra, T]
+  type MessagingAndOrdersAlg[T] = EitherK[MessagingAlgebra, OrdersAlgebra, T]
 
 }
 

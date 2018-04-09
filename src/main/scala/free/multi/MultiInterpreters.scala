@@ -44,12 +44,12 @@ object MultiInterpreters extends App {
     }
   }
 
-  val futureReportsInterpreter = new (HapromReportAlgebra ~> Future) {
+  val futureOrdersInterpreter = new (OrdersAlgebra ~> Future) {
 
     val eventLog = InMemoryEventStore.apply[String]
 
-    override def apply[A](fa: HapromReportAlgebra[A]): Future[A] = fa match {
-      case UpdateHapromProduct(id, product, offset) => {
+    override def apply[A](fa: OrdersAlgebra[A]): Future[A] = fa match {
+      case AddCommerceItem(id, product, offset) => {
         val provider = RestClient.callProvider(product.providerId).unsafeRunSync()
         val section = provider.sections
            .filter(section => section.section == product.categoryId)
@@ -58,25 +58,25 @@ object MultiInterpreters extends App {
         val updatedEvents: Iterable[Either[Error, Event[_]]] = product.subProducts.map(entry => {
           val store = entry._2.platformId.map(p => {println(p); RestClient.callStore(p).unsafeRunSync()})
           val id = entry._1 + product.ean.getOrElse("")
-          HapromProductUpdated(id, product, store.map(_.tightFlowIndicator), section.hasLogisticMargin,
-            Instant.now().toEpochMilli)
+          val commerceItem = CommerceItem(id, store.map(_.tightFlowIndicator), section.hasLogisticMargin)
+          OrderCommerceItemUpdated(id, commerceItem, Instant.now().toEpochMilli)
         })
           .map(hpu => eventLog.put(hpu.id, hpu))
 
         Future.successful(updatedEvents.map {_ match {
-          case Left(err) => HapromFailed(product.id, product, err, Instant.now().toEpochMilli)
-          case Right(event) => event.asInstanceOf[HapromEvent[Product]]
+          case Left(err) => OrderUpdateFailed(product.id, product, err, Instant.now().toEpochMilli)
+          case Right(event) => event.asInstanceOf[OrderEvent[Product]]
         }}.toStream)
       }
 
-      case UpdateHapromSale(id, subproduct, offset) => {
+      case AddPaymentAddress(id, subproduct, offset) => {
         val store = subproduct.platformId.map(RestClient.callStore(_).unsafeRunSync())
-        val hsu = HapromSaleUpdated(id, subproduct, store.flatMap(_.logistic), Instant.now().toEpochMilli)
+        val hsu = OrderPaymentGroupUpdated(id, subproduct, store.flatMap(_.logistic), Instant.now().toEpochMilli)
         val updatedSales = eventLog.put(hsu.id, hsu)
         Future.successful {
           updatedSales match {
-            case Left(err) => HapromFailed(subproduct.id, subproduct, err, Instant.now().toEpochMilli)
-            case Right(event) => event.asInstanceOf[HapromEvent[SubProduct]]
+            case Left(err) => OrderUpdateFailed(subproduct.id, subproduct, err, Instant.now().toEpochMilli)
+            case Right(event) => event.asInstanceOf[OrderEvent[SubProduct]]
           }
         }
       }
@@ -85,7 +85,7 @@ object MultiInterpreters extends App {
     }
   }
 
-  val futureMessagingOrReportInterpreter = futureMessagingInterpreter or futureReportsInterpreter
+  val futureMessagingOrReportInterpreter = futureMessagingInterpreter or futureOrdersInterpreter
 
   import Programs._
 

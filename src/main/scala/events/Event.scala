@@ -3,15 +3,15 @@ package events
 import common.models._
 
 trait Event[A] {
-  def at: Long
+  val at: Long
 }
 
-trait HapromEvent[A <: BaseEntity] extends Event[A]
+trait OrderEvent[A <: BaseEntity] extends Event[A]
 
-case class HapromProductUpdated(id: Id, product: Product, tightFlowIndicator: Option[String], hasLogisticMargin: Boolean, at: Long)
-  extends HapromEvent[HapromProduct]
+case class OrderCommerceItemUpdated(id: Id, commerceItem: CommerceItem, at: Long)
+  extends OrderEvent[CommerceItem]
 
-case class HapromSaleUpdated(id: Id, subProduct: SubProduct, logisticCircuit: Option[String], at: Long)
-  extends HapromEvent[HapromSale]
+case class OrderPaymentGroupUpdated(id: Id, payment: PaymentGroup, at: Long)
+  extends OrderEvent[PaymentGroup]
 
-case class HapromFailed[A <: BaseEntity](id: Id, entity: A, message: String, at: Long) extends HapromEvent[A]
+case class OrderUpdateFailed[A <: BaseEntity](id: Id, entity: A, message: String, at: Long) extends OrderEvent[A]
