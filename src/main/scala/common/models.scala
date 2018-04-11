@@ -1,17 +1,22 @@
 package common
 
+import common.models.BaseEntity
+import io.circe.Decoder
+
 object models {
   type Id = String
 
   type Error = String
 
-  sealed trait PaymentMethod
-  final case class Credit(card: String, owner: String) extends PaymentMethod
-  final case class PayPal(user: String, payPalToken: String) extends PaymentMethod
-
   sealed trait BaseEntity {
     val id: Id
   }
+
+  sealed trait PaymentMethod extends BaseEntity {
+    val platformId: Option[String]
+  }
+  final case class Credit(id: Id, card: String, owner: String, platformId: Option[String]) extends PaymentMethod
+  final case class PayPal(id: Id, user: String, payPalToken: String, platformId: Option[String]) extends PaymentMethod
 
   case class ProvidedSection(section: String, hasLogisticMargin: Boolean)
   case class Provider(id: Id, sections: List[ProvidedSection]) extends BaseEntity
@@ -24,9 +29,10 @@ object models {
   case class Address(id: Id, street: String, number: Int) extends BaseEntity
 
   case class CommerceItem(id: Id, tightFlowIndicator: Option[String], hasLogisticMargin: Boolean) extends BaseEntity
-  case class PaymentGroup(id: Id, logisticCircuit: String, address: Address, paymentMethod: PaymentMethod) extends BaseEntity
+  case class PaymentGroup(id: Id, logisticCircuit: String, address: Option[Address], paymentMethod: PaymentMethod) extends BaseEntity
 
   case class Order(id: Id, commerceItems: List[CommerceItem], paymentGroup: Option[PaymentGroup]) extends BaseEntity
 
-  case class Message[A <: BaseEntity](key: String, entity: Option[A], timestamp: Long)
+  case class Message[A <: BaseEntity](key: String, entity: A, command: String, timestamp: Long)
+
 }
