@@ -63,7 +63,6 @@ object MultiInterpreters extends App {
     override def apply[A](fa: OrdersAlgebra[A]): Future[A] = fa match {
 
       case CreateOrder(id, order) => {
-        println(id)
         val event = OrderCreated(id, Order(id, List.empty, None).some, currentTime)
         Future.successful {
           eventLog.put(id, event) match {

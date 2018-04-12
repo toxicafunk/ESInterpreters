@@ -35,12 +35,10 @@ object Programs {
           case Right(json) => {
             val key = (json \\("key")).head.asString.get
             val cmd = (json \\("command")).head.asString.get
-            println(s"$cmd: $key")
             val j: Json = json.\\("entity").head
             val evts = cmd match {
               case "createOrder" => {
                 val o = j.as[Order]
-                println(s"Enter: $o");
                 ordersCtx.createOrder(key, o.right.get)
               }
               case "addCommerceItem" => ordersCtx.addCommerceItem(key, j.as[Product].right.get, 0)
