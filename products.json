@@ -1,3 +1,2 @@
-{"id":"P123","categoryId":"01", "ean": "890", "providerId": "PR100", "subProducts": { "SP000": {"id":"SP000", "platformId": "abc01" }}}
-{"id":"P234","categoryId":"01", "ean": "890", "providerId": "PR100", "subProducts": { "SP000": {"id":"SP000", "platformId": "abc01" }}}
-{"id":"P345","categoryId":"01", "ean": "890", "providerId": "PR100", "subProducts": { "SP000": {"id":"SP000", "platformId": "abc01" }}}
+{"key": "P123", "command": "createOrder", "timestamp": 1523524766634, "entity": {"id":"P123", "commerceItems": []}}
+//{"key": "P123", "command": "addCommerceItem", "timestamp": 1523524766634, "entity": {"id":"P123","categoryId":"01", "ean": "890", "providerId": "PR100", "subProducts": { "SP000": {"id":"SP000", "platformId": "abc01" }}}}

@@ -2,7 +2,7 @@ package free.multi
 
 import cats.free.Free
 import common.models._
-import events.OrderCommerceItemUpdated
+import events.{OrderCommerceItemUpdated, OrderEvent}
 import free.multi.Algebras.{Messages, MessagingAndOrdersAlg, Orders}
 import io.circe.Json
 import io.circe.generic.auto._
@@ -29,17 +29,27 @@ object Programs {
       case Stream(message: String) => {
         parse(message) match {
           case Left(error) => {
-            println(error); Free.pure(Stream.Empty)
+            println(error);
+            Free.pure(Stream.Empty)
           }
           case Right(json) => {
             val key = (json \\("key")).head.asString.get
             val cmd = (json \\("command")).head.asString.get
+            println(s"$cmd: $key")
             val j: Json = json.\\("entity").head
             val evts = cmd match {
-              case "createOrder" => ordersCtx.createOrder(key, j.as[Order].right.get)
+              case "createOrder" => {
+                val o = j.as[Order]
+                println(s"Enter: $o");
+                ordersCtx.createOrder(key, o.right.get)
+              }
               case "addCommerceItem" => ordersCtx.addCommerceItem(key, j.as[Product].right.get, 0)
               case "addPaymentAddress" => ordersCtx.addPaymentAddress(key, j.as[Address].right.get)
               case "addPaymentGroup" => ordersCtx.addPaymentGroup(key, j.as[PaymentMethod].right.get)
+              case _ => {
+                println("Unrecognized command")
+                ordersCtx.unknownCommand(key)
+              }
             }
 
             evts.map(eventStream => {
