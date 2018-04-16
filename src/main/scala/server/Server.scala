@@ -17,6 +17,7 @@ object Server extends StreamApp[IO] {
   override def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, ExitCode] =
     BlazeBuilder[IO]
       .bindHttp(port)
+      .mountService(StaticService.service, "/")
       .mountService(EventService.service, "/events")
       .serve
 }
