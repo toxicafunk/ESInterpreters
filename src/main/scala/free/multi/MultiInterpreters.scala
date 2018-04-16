@@ -1,7 +1,9 @@
 package free.multi
 
 import java.time.Instant
+import java.util.concurrent.{ExecutorService, Executors}
 
+import cats.data.EitherK
 import cats.implicits._
 import cats.~>
 import common.RestClient
@@ -14,7 +16,7 @@ import scala.collection.mutable.Queue
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-object MultiInterpreters extends App {
+object MultiInterpreters {
 
   val futureMessagingInterpreter = new (MessagingAlgebra ~> Future) {
 
@@ -45,9 +47,9 @@ object MultiInterpreters extends App {
 
   val futureOrdersInterpreter = new (OrdersAlgebra ~> Future) {
 
-    def currentTime: Long = Instant.now().toEpochMilli
-
     val eventLog: EventStore[String] = InMemoryEventStore.apply[String]
+
+    def currentTime: Long = Instant.now().toEpochMilli
 
     def projection(events: List[Event[_]]): Order = {
       events.foldRight(Order("", List.empty, None))((evt, order) => evt.asInstanceOf[OrderEvent[_, _]].entity match {
@@ -66,7 +68,10 @@ object MultiInterpreters extends App {
         val event = OrderCreated(id, Order(id, List.empty, None).some, currentTime)
         Future.successful {
           eventLog.put(id, event) match {
-            case Left(err) => { println(err); Stream(OrderUpdateFailed(id, order.some, order, err, currentTime)) }
+            case Left(err) => {
+              println(err);
+              Stream(OrderUpdateFailed(id, order.some, order, err, currentTime))
+            }
             case Right(evt) => {
               println(evt)
               Stream(evt.asInstanceOf[OrderEvent[Order, Order]])
@@ -83,7 +88,8 @@ object MultiInterpreters extends App {
 
         val updatedEvents: Iterable[Either[Error, Event[_]]] = product.subProducts.map(entry => {
           val store = entry._2.platformId.map(p => {
-            println(p); RestClient.callStore(p).unsafeRunSync()
+            println(p);
+            RestClient.callStore(p).unsafeRunSync()
           })
           val id = entry._1 + product.ean.getOrElse("")
           val commerceItem = CommerceItem(id, store.map(_.tightFlowIndicator), section.hasLogisticMargin)
@@ -123,6 +129,8 @@ object MultiInterpreters extends App {
       }
 
       case Replay(id, offset, event) => ???
+
+      case UnknownCommand(id) => { println(s"Unknown command for $id"); Future.successful(Stream.Empty) }
     }
   }
 
@@ -130,12 +138,25 @@ object MultiInterpreters extends App {
 
   import Programs._
 
-  while (true) {
-    val result: Future[Stream[String]] =
-      processMessage("192.168.99.100:9092", "test", "testers", false)
-        .foldMap(futureMessagingOrReportInterpreter)
+  var executor: ExecutorService = Executors.newSingleThreadExecutor
 
-    result.filter(!_.isEmpty).foreach(s => println(s"message processed: $s"))
-    Thread.sleep(2000L)
+  def run(): Unit = {
+    executor.execute(() => {
+      println(s"Interpreter executing on thread ${Thread.currentThread().getId}")
+      while (true) {
+        val result: Future[Stream[String]] =
+          processMessage("192.168.99.100:9092", "test", "testers", false)
+            .foldMap(futureMessagingOrReportInterpreter)
+
+        result.filter(_.nonEmpty).foreach(s => println(s"message processed: $s"))
+        Thread.sleep(2000L)
+      }
+    })
   }
+
+  def shutdown(): Unit = {
+    if (executor != null)
+      executor.shutdown()
+  }
+
 }

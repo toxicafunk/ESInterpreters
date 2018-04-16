@@ -24,16 +24,14 @@ class Consumer(val brokers: String,
   def run(): Unit = {
     consumer.subscribe(Collections.singletonList(topic))
 
-    executor.execute(new Runnable {
-      override def run(): Unit = {
-        println(s"Subscribed to topic $topic on ${Thread.currentThread().getId}")
-        while (true) {
-          val records: ConsumerRecords[String, String] = consumer poll 1000
-          if (!records.isEmpty) {
-            println(s"Received ${records.size} messages")
-            val q = atomicQueue.get
-            atomicQueue.set(q ++ records)
-          }
+    executor.execute(() => {
+      println(s"Subscribed to topic $topic on ${Thread.currentThread().getId}")
+      while (true) {
+        val records: ConsumerRecords[String, String] = consumer poll 1000
+        if (!records.isEmpty) {
+          println(s"Received ${records.size} messages")
+          val q = atomicQueue.get
+          atomicQueue.set(q ++ records)
         }
       }
     })
