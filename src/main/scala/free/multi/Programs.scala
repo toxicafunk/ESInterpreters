@@ -2,7 +2,6 @@ package free.multi
 
 import cats.free.Free
 import common.models._
-import events.{OrderCommerceItemUpdated, OrderEvent}
 import free.multi.Algebras.{Messages, MessagingAndOrdersAlg, Orders}
 import io.circe.Json
 import io.circe.generic.auto._
@@ -54,8 +53,9 @@ object Programs {
               if (!autoCommit)
                 msgCtx.commit()
               eventStream.map(event => {
-                val json = event.asInstanceOf[OrderCommerceItemUpdated].asJson.noSpaces
+                val json = event.projection.asJson.noSpaces
                 msgCtx.sendMessage(brokers, topic + "View", json)
+                println(json)
                 json
               })
             })

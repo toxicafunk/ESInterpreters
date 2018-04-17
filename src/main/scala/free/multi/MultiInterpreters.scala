@@ -3,13 +3,14 @@ package free.multi
 import java.time.Instant
 import java.util.concurrent.{ExecutorService, Executors}
 
-import cats.data.EitherK
 import cats.implicits._
 import cats.~>
+
 import common.RestClient
 import common.models._
 import events._
 import free.multi.Algebras._
+
 import kafka.{Consumer, Producer}
 
 import scala.collection.mutable.Queue
@@ -47,20 +48,9 @@ object MultiInterpreters {
 
   val futureOrdersInterpreter = new (OrdersAlgebra ~> Future) {
 
-    val eventLog: EventStore[String] = InMemoryEventStore.apply[String]
+    import free.multi.eventLog
 
     def currentTime: Long = Instant.now().toEpochMilli
-
-    def projection(events: List[Event[_]]): Order = {
-      events.foldRight(Order("", List.empty, None))((evt, order) => evt.asInstanceOf[OrderEvent[_, _]].entity match {
-        case None => order
-        case Some(enty) => enty match {
-          case o@Order(_, _, _) => o
-          case c@CommerceItem(_, _, _) => order.copy(commerceItems = c +: order.commerceItems)
-          case p@PaymentGroup(_, _, _, _) => order.copy(paymentGroup = p.some)
-        }
-      })
-    }
 
     override def apply[A](fa: OrdersAlgebra[A]): Future[A] = fa match {
 

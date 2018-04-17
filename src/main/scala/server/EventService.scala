@@ -14,7 +14,7 @@ import org.http4s.dsl.io._
 
 object EventService {
 
-  val eventLog = MultiInterpreters.futureOrdersInterpreter.eventLog
+  import free.multi.eventLog
 
   val service = HttpService[IO] {
     case GET -> Root / id => {
