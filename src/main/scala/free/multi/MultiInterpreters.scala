@@ -5,12 +5,10 @@ import java.util.concurrent.{ExecutorService, Executors}
 
 import cats.implicits._
 import cats.~>
-
 import common.RestClient
 import common.models._
 import events._
 import free.multi.Algebras._
-
 import kafka.{Consumer, Producer}
 
 import scala.collection.mutable.Queue
@@ -47,8 +45,6 @@ object MultiInterpreters {
   }
 
   val futureOrdersInterpreter = new (OrdersAlgebra ~> Future) {
-
-    import free.multi.eventLog
 
     def currentTime: Long = Instant.now().toEpochMilli
 
