@@ -80,24 +80,28 @@ object MultiInterpreters {
             println(p);
             RestClient.callStore(p).unsafeRunSync()
           })
-          val id = entry._1 + product.ean.getOrElse("")
-          val commerceItem = CommerceItem(id, store.map(_.tightFlowIndicator), section.hasLogisticMargin)
+          val ciId = entry._1 + product.ean.getOrElse("")
+          val commerceItem = CommerceItem(ciId, store.map(_.tightFlowIndicator), section.hasLogisticMargin)
           OrderCommerceItemUpdated(id, commerceItem.some, currentTime)
         })
           .map(hpu => eventLog.put(hpu.id, hpu))
 
         Future.successful(updatedEvents.map {
-          _ match {
-            case Left(err) => OrderUpdateFailed[CommerceItem, Product](id, None, product, err, currentTime)
-            case Right(event) => event.asInstanceOf[OrderEvent[CommerceItem, Product]]
-          }
+          case Left(err) => OrderUpdateFailed[CommerceItem, Product](id, None, product, err, currentTime)
+          case Right(event) => event.asInstanceOf[OrderEvent[CommerceItem, Product]]
         }.toStream)
       }
 
       case AddPaymentMethod(orderId, paymentMethod) => {
         val store = paymentMethod.platformId.map(RestClient.callStore(_).unsafeRunSync())
-        val paymentGroup = PaymentGroup(orderId, store.flatMap(_.logistic).getOrElse(""), None, paymentMethod.some)
+        println(s"Store: $store")
+        val method = paymentMethod match {
+          case c@Credit(_,_,_,_) => c
+          case p@PayPal(_,_,_,_) => p
+        }
+        val paymentGroup = PaymentGroup(orderId, store.flatMap(_.logistic).getOrElse(""), None, method.some)
         val event = OrderPaymentGroupUpdated(orderId, paymentGroup.some, currentTime)
+        println(event)
         Future.successful {
           eventLog.put(event.id, event) match {
             case Left(err) => Stream(OrderUpdateFailed[PaymentGroup, PaymentMethod](orderId, None, paymentMethod, err, currentTime))

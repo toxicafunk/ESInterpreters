@@ -31,22 +31,30 @@ object Programs {
             println(error);
             Free.pure(Stream.Empty)
           }
-          case Right(json) => {
-            val key = (json \\("key")).head.asString.get
-            val cmd = (json \\("command")).head.asString.get
+          case Right(json) =>
+            val key = (json \\ "key").head.asString.get
+            val cmd = (json \\ "command").head.asString.get
             val j: Json = json.\\("entity").head
             val evts = cmd match {
-              case "createOrder" => {
+              case "createOrder" =>
                 val o = j.as[Order]
                 ordersCtx.createOrder(key, o.right.get)
+
+              case "addCommerceItem" => j.as[Product] match {
+                  case Right(product) => ordersCtx.addCommerceItem(key, product, 0)
+                  case Left(err) => println(err); ordersCtx.unknownCommand(key)
+                }
+              case "addPaymentAddress" => j.as[Address] match {
+                case Right(address) => ordersCtx.addPaymentAddress(key, address)
+                case Left(err) => println(err); ordersCtx.unknownCommand(key)
               }
-              case "addCommerceItem" => ordersCtx.addCommerceItem(key, j.as[Product].right.get, 0)
-              case "addPaymentAddress" => ordersCtx.addPaymentAddress(key, j.as[Address].right.get)
-              case "addPaymentGroup" => ordersCtx.addPaymentGroup(key, j.as[PaymentMethod].right.get)
-              case _ => {
+              case "addPaymentGroup" => j.as[Credit] match {
+                case Right(paymentMethod) => ordersCtx.addPaymentGroup(key, paymentMethod)
+                case Left(err) => println(err); ordersCtx.unknownCommand(key)
+              }
+              case _ =>
                 println("Unrecognized command")
                 ordersCtx.unknownCommand(key)
-              }
             }
 
             evts.map(eventStream => {
@@ -59,7 +67,6 @@ object Programs {
                 json
               })
             })
-          }
         }
       }
     }

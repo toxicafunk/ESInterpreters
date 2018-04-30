@@ -13,15 +13,17 @@ object EventService {
 
   import free.multi.eventLog
 
-  val service = HttpService[IO] {
-    case GET -> Root / id => {
+  val service: HttpService[IO] = HttpService[IO] {
+    case GET -> Root / id =>
       println(s"id: $id")
-      val lst = eventLog.get(id).toStream.map { _ match {
+      val events = eventLog.get(id)
+      println(events)
+      val jsons = events.toStream.map {
         case oc@OrderCreated(_, _, _) => oc.asJson
         case ocu@OrderCommerceItemUpdated(_, _, _) => ocu.asJson
         case opu@OrderPaymentGroupUpdated(_, _, _) => opu.asJson
-      }}.asJson
-      Ok(lst)
-    }
+        case opa@OrderPaymentAddressUpdated(_,_,_) => opa.asJson
+      }.asJson
+      Ok(jsons)
   }
 }

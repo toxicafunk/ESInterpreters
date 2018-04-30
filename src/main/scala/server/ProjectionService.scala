@@ -16,10 +16,11 @@ object ProjectionService {
   val service = HttpService[IO] {
     case GET -> Root / id => {
       println(s"id: $id")
-      Ok(eventLog.get(id).last match {
+      Ok(eventLog.get(id).head match {
         case oc@OrderCreated(_, _, _) => oc.projection.asJson
         case ocu@OrderCommerceItemUpdated(_, _, _) => ocu.projection.asJson
         case opu@OrderPaymentGroupUpdated(_, _, _) => opu.projection.asJson
+        case opa@OrderPaymentAddressUpdated(_,_,_) => opa.projection.asJson
       })
     }
   }
