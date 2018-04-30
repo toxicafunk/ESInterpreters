@@ -4,7 +4,7 @@ import cats.InjectK
 import cats.data.EitherK
 import cats.free.Free
 import common.models._
-import events.{EventStore, OrderEvent}
+import events.OrderEvent
 
 object Algebras {
   //type Message = String
@@ -38,22 +38,22 @@ object Algebras {
   case class Replay(id: Id, offset: Int, event: String) extends OrdersAlgebra[Unit]
 
   class Orders[F[_]](implicit i: InjectK[OrdersAlgebra, F]) {
-    def createOrder(id: Id, entity: Order)(implicit eventLog: EventStore[String]): Free[F, Stream[OrderEvent[Order, Order]]] =
+    def createOrder(id: Id, entity: Order): Free[F, Stream[OrderEvent[Order, Order]]] =
       Free.inject(CreateOrder(id, entity))
 
-    def addCommerceItem(orderId: Id, entity: Product, qty: Int)(implicit eventLog: EventStore[String]): Free[F, Stream[OrderEvent[CommerceItem, Product]]] =
+    def addCommerceItem(orderId: Id, entity: Product, qty: Int): Free[F, Stream[OrderEvent[CommerceItem, Product]]] =
       Free.inject(AddCommerceItem(orderId, entity, qty))
 
-    def addPaymentGroup(orderId: Id, entity: PaymentMethod)(implicit eventLog: EventStore[String]): Free[F, Stream[OrderEvent[PaymentGroup, PaymentMethod]]] =
+    def addPaymentGroup(orderId: Id, entity: PaymentMethod): Free[F, Stream[OrderEvent[PaymentGroup, PaymentMethod]]] =
       Free.inject(AddPaymentMethod(orderId, entity))
 
-    def addPaymentAddress(orderId: Id, entity: Address)(implicit eventLog: EventStore[String]): Free[F, Stream[OrderEvent[PaymentGroup, Address]]] =
+    def addPaymentAddress(orderId: Id, entity: Address): Free[F, Stream[OrderEvent[PaymentGroup, Address]]] =
       Free.inject(AddPaymentAdress(orderId, entity))
 
     def unknownCommand(id: Id): Free[F, Stream[OrderEvent[Order, Order]]] =
       Free.inject(UnknownCommand(id))
 
-    def replay(id: Id, offset: Int, event: String)(implicit eventLog: EventStore[String]): Free[F, Unit] =
+    def replay(id: Id, offset: Int, event: String): Free[F, Unit] =
       Free.inject(Replay(id, offset, event))
   }
   object Orders {

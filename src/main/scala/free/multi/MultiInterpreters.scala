@@ -52,6 +52,9 @@ object MultiInterpreters {
 
     def currentTime: Long = Instant.now().toEpochMilli
 
+    val st: Stream[String] = Stream.Empty
+    st.isEmpty
+
     override def apply[A](fa: OrdersAlgebra[A]): Future[A] = fa match {
 
       case CreateOrder(id, order) => {
@@ -70,7 +73,7 @@ object MultiInterpreters {
         }
       }
 
-      case AddCommerceItem(id, product, qty) => {
+      case AddCommerceItem(id, product, qty@_) => {
         val provider = RestClient.callProvider(product.providerId).unsafeRunSync()
         val section = provider.sections
           .filter(section => section.section == product.categoryId)
@@ -118,7 +121,7 @@ object MultiInterpreters {
         }
       }
 
-      case Replay(id, offset, event) => ???
+      case Replay(id@_, offset@_, event@_) => ???
 
       case UnknownCommand(id) => { println(s"Unknown command for $id"); Future.successful(Stream.Empty) }
     }

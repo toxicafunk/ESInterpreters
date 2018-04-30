@@ -1,14 +1,12 @@
 package common
 
 
-import models.{Provider, Store}
-import cats._, cats.effect._, cats.implicits._
-import org.http4s.Uri
-import org.http4s.client.blaze._
-import org.http4s.circe._
+import cats.effect._
+import common.models.{Provider, Store}
 import io.circe.generic.auto._
-
-import scala.concurrent.ExecutionContext.Implicits.global
+import org.http4s.Uri
+import org.http4s.circe._
+import org.http4s.client.blaze._
 
 object RestClient {
   val httpClient = Http1Client[IO]()

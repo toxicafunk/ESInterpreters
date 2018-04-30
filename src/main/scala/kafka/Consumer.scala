@@ -6,7 +6,6 @@ import java.util.{Collections, Properties}
 
 import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecord, ConsumerRecords, KafkaConsumer}
 
-import scala.collection.JavaConversions._
 import scala.collection.mutable.Queue
 
 class Consumer(val brokers: String,
@@ -28,10 +27,11 @@ class Consumer(val brokers: String,
       println(s"Subscribed to topic $topic on ${Thread.currentThread().getId}")
       while (true) {
         val records: ConsumerRecords[String, String] = consumer poll 1000
-        if (!records.isEmpty) {
-          println(s"Received ${records.size} messages")
+        records.forEach { record =>
+          println(s"Received ${records.count()} messages")
           val q = atomicQueue.get
-          atomicQueue.set(q ++ records)
+          q.enqueue(record)
+          atomicQueue.set(q)
         }
       }
     })

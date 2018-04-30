@@ -1,8 +1,5 @@
 package common
 
-import common.models.BaseEntity
-import io.circe.Decoder
-
 object models {
   type Id = String
 

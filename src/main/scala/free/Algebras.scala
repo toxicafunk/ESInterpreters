@@ -1,10 +1,6 @@
 package free
 
-import cats.data.EitherK
 import cats.free.Free
-import cats.implicits._
-import cats.{InjectK, Monad, ~>}
-import common.models.SubProduct
 
 object Algebras {
   type Message = String
