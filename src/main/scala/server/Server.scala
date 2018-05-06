@@ -20,5 +20,6 @@ object Server extends StreamApp[IO] {
       .mountService(StaticService.service, "/")
       .mountService(EventService.service, "/events")
       .mountService(ProjectionService.service, "/projection")
+      .mountService(ReplayService.service, "/replay")
       .serve
 }

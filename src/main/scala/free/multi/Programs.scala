@@ -11,14 +11,8 @@ import io.circe.syntax._
 
 object Programs {
 
-  /*implicit def messageDecoder[A<:BaseEntity:Decoder]: Decoder[Message[A]] = (c: HCursor) => {
-    for {
-      k <- c.downField("key").as[String]
-      cmd <- c.downField("command").as[String]
-      entity <- c.downField("entity").as[A]
-      ts <- c.downField("timestamp").as[Long]
-    } yield Message(k, entity, cmd, ts)
-  }*/
+  def replay(offset: Long)(implicit ordersCtx: Orders[MessagingAndOrdersAlg]): Free[MessagingAndOrdersAlg, String] =
+    ordersCtx.replay("", 3L, "").flatMap(_ => Free.pure(s"Replayed from offset $offset"))
 
   def processMessage[A <: BaseEntity](brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean)
                                      (implicit msgCtx: Messages[MessagingAndOrdersAlg],

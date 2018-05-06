@@ -17,9 +17,10 @@ import scala.concurrent.Future
 
 object MultiInterpreters {
 
-  val futureMessagingInterpreter = new (MessagingAlgebra ~> Future) {
+  var consumerOpt: Option[Consumer] = None
+  var producerOpt: Option[Producer] = None
 
-    var consumerOpt: Option[Consumer] = None
+  val futureMessagingInterpreter = new (MessagingAlgebra ~> Future) {
 
     override def apply[A](fa: MessagingAlgebra[A]): Future[A] = fa match {
       case ReceiveMessage(brokers, topic, consumerGroup, autoCommit) => {
@@ -29,17 +30,18 @@ object MultiInterpreters {
           Some(cons)
         }
 
-        consumerOpt match {
-          case None => Future(Stream.empty)
-          case Some(c) => Future(c.atomicQueue.getAndSet(Queue.empty).toStream.map(_.value()))
-        }
+        Future.successful(consumerOpt.map(c => c.atomicQueue.getAndSet(Queue.empty).toStream.map(_.value())).getOrElse(Stream.Empty))
       }
 
+      /*_*/
       case Commit() => Future.successful(consumerOpt.get.consumer.commitSync())
+      /*_*/
 
       case SendMessage(brokers, topic, message) => {
-        val producer = new Producer(brokers)
-        Future.successful(producer.sendMessage(topic, "", message))
+        producerOpt = producerOpt.orElse(Some(new Producer(brokers)))
+        /*_*/
+        producerOpt.map(p => Future.successful(p.sendMessage(topic, "", message))).getOrElse(Future.unit)
+        /*_*/
       }
     }
   }
@@ -48,24 +50,28 @@ object MultiInterpreters {
 
     def currentTime: Long = Instant.now().toEpochMilli
 
-    val st: Stream[String] = Stream.Empty
-    st.isEmpty
+    type OrderOrderEvent = OrderEvent[Order, Order]
+    type StreamOrderOrder = Stream[OrderOrderEvent]
+
+    type CommerceItemEvent = OrderEvent[CommerceItem, Product]
+    type StreamCommerceItem = Stream[CommerceItemEvent]
+
+    type PaymentGroupEvent = OrderEvent[PaymentGroup, PaymentMethod]
+    type StreamPaymentGroup = Stream[PaymentGroupEvent]
+
+    type PaymentGroupAddressEvent = OrderEvent[PaymentGroup, Address]
+    type StreamPaymentGroupAddress = Stream[PaymentGroupAddressEvent]
 
     override def apply[A](fa: OrdersAlgebra[A]): Future[A] = fa match {
 
       case CreateOrder(id, order) => {
         val event = OrderCreated(id, Order(id, List.empty, None).some, currentTime)
-        Future.successful {
-          eventLog.put(id, event) match {
-            case Left(err) => {
-              println(err);
-              Stream(OrderUpdateFailed(id, order.some, order, err, currentTime))
-            }
-            case Right(evt) => {
-              println(evt)
-              Stream(evt.asInstanceOf[OrderEvent[Order, Order]])
-            }
-          }
+
+        eventLog.put(id, event) match {
+          /*_*/
+          case Left(err) => Future.successful(Stream(OrderUpdateFailed(id, order.some, order, err, currentTime)))
+          case Right(evt) => Future.successful(Stream(evt.asInstanceOf[OrderOrderEvent]))
+          /*_*/
         }
       }
 
@@ -86,44 +92,62 @@ object MultiInterpreters {
         })
           .map(hpu => eventLog.put(hpu.id, hpu))
 
+        /*_*/
         Future.successful(updatedEvents.map {
           case Left(err) => OrderUpdateFailed[CommerceItem, Product](id, None, product, err, currentTime)
-          case Right(event) => event.asInstanceOf[OrderEvent[CommerceItem, Product]]
+          case Right(event) => event.asInstanceOf[CommerceItemEvent]
         }.toStream)
+        /*_*/
       }
 
       case AddPaymentMethod(orderId, paymentMethod) => {
         val store = paymentMethod.platformId.map(RestClient.callStore(_).unsafeRunSync())
         println(s"Store: $store")
         val method = paymentMethod match {
-          case c@Credit(_,_,_,_) => c
-          case p@PayPal(_,_,_,_) => p
+          case c@Credit(_, _, _, _) => c
+          case p@PayPal(_, _, _, _) => p
         }
         val paymentGroup = PaymentGroup(orderId, store.flatMap(_.logistic).getOrElse(""), None, method.some)
         val event = OrderPaymentGroupUpdated(orderId, paymentGroup.some, currentTime)
         println(event)
-        Future.successful {
-          eventLog.put(event.id, event) match {
-            case Left(err) => Stream(OrderUpdateFailed[PaymentGroup, PaymentMethod](orderId, None, paymentMethod, err, currentTime))
-            case Right(evt) => Stream(evt.asInstanceOf[OrderEvent[PaymentGroup, PaymentMethod]])
-          }
+
+
+        eventLog.put(event.id, event) match {
+          /*_*/
+          case Left(err) => Future.successful(Stream(OrderUpdateFailed[PaymentGroup, PaymentMethod](orderId, None, paymentMethod, err, currentTime)))
+          case Right(evt) => Future.successful(Stream(evt.asInstanceOf[PaymentGroupEvent]))
+          /*_*/
         }
+
       }
 
       case AddPaymentAdress(orderId, address) => {
         val paymentGroup = PaymentGroup(orderId, "", address.some, None)
         val event = OrderPaymentAddressUpdated(orderId, paymentGroup.some, currentTime)
-        Future.successful {
-          eventLog.put(event.id, event) match {
-            case Left(err) => Stream(OrderUpdateFailed(orderId, None, address, err, currentTime))
-            case Right(evt) => Stream(evt.asInstanceOf[OrderEvent[PaymentGroup, Address]])
-          }
+
+        eventLog.put(event.id, event) match {
+          /*_*/
+          case Left(err) => Future.successful(Stream(OrderUpdateFailed(orderId, None, address, err, currentTime)))
+          case Right(evt) => Future.successful(Stream(evt.asInstanceOf[PaymentGroupAddressEvent]))
+          /*_*/
         }
+
       }
 
-      case Replay(id@_, offset@_, event@_) => ???
+      case Replay(id@_, offset@_, event@_) => {
+        consumerOpt.map(c => {
+          c.shutdown()
+          c.replay(offset)
+        })
+        Future.unit
+      }
 
-      case UnknownCommand(id) => { println(s"Unknown command for $id"); Future.successful(Stream.Empty) }
+      case UnknownCommand(id) => {
+        println(s"Unknown command for $id");
+        /*_*/
+        Future.successful(Stream.Empty)
+        /*_*/
+      }
     }
   }
 

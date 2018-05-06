@@ -5,6 +5,7 @@ import java.util.concurrent.{ExecutorService, Executors}
 import java.util.{Collections, Properties}
 
 import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecord, ConsumerRecords, KafkaConsumer}
+import org.apache.kafka.common.TopicPartition
 
 import scala.collection.mutable.Queue
 
@@ -35,6 +36,15 @@ class Consumer(val brokers: String,
         }
       }
     })
+  }
+
+
+  def replay(offset: Long): Unit = {
+    consumer.partitionsFor(topic) forEach { partition => {
+      val topicPartition = new TopicPartition(topic, partition.partition())
+      consumer.seek(topicPartition, offset)
+    }}
+    run()
   }
 
   def shutdown(): Unit = {
