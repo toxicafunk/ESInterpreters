@@ -20,6 +20,7 @@ class Producer(val brokers: String) {
     //async
     //producer.send(data, (m,e) => {})
     //sync
+    println(s"Sending: $data")
     producer.send(data)
     ()
   }

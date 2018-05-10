@@ -38,6 +38,7 @@ object MultiInterpreters {
       /*_*/
 
       case SendMessage(brokers, topic, message) => {
+        println(s"SendMessage: $brokers - $topic - $message")
         producerOpt = producerOpt.orElse(Some(new Producer(brokers)))
         /*_*/
         producerOpt.map(p => Future.successful(p.sendMessage(topic, "", message))).getOrElse(Future.unit)
@@ -134,12 +135,13 @@ object MultiInterpreters {
 
       }
 
-      case Replay(id@_, offset@_, event@_) => {
+      case Replay(_, replayMsg) => {
+        println(s"Consumer is present ${consumerOpt.isDefined} - ${Thread.currentThread().getName} ${Thread.currentThread().getId}")
         consumerOpt.map(c => {
-          c.shutdown()
-          c.replay(offset)
+          println(s"Seeking offset ${replayMsg.offset}")
+          c.replay(replayMsg.offset)
         })
-        Future.unit
+        Future.successful(Stream.empty)
       }
 
       case UnknownCommand(id) => {
@@ -159,7 +161,7 @@ object MultiInterpreters {
 
   def run(): Unit = {
     executor.execute(() => {
-      println(s"Interpreter executing on thread ${Thread.currentThread().getId}")
+      println(s"Interpreter executing on thread ${Thread.currentThread().getName} ${Thread.currentThread().getId}")
       while (true) {
         val result: Future[Stream[String]] =
           processMessage("192.168.99.100:9092", "test", "testers", false)

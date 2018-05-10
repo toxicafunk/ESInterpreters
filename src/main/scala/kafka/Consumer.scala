@@ -25,9 +25,11 @@ class Consumer(val brokers: String,
     consumer.subscribe(Collections.singletonList(topic))
 
     executor.execute(() => {
-      println(s"Subscribed to topic $topic on ${Thread.currentThread().getId}")
+      println(s"Subscribed to topic $topic on ${Thread.currentThread().getName} ${Thread.currentThread().getId}")
       while (true) {
-        val records: ConsumerRecords[String, String] = consumer poll 1000
+        val records: ConsumerRecords[String, String] = consumer.synchronized {
+          consumer poll 1000
+        }
         records.forEach { record =>
           println(s"Received ${records.count()} messages")
           val q = atomicQueue.get
@@ -38,20 +40,34 @@ class Consumer(val brokers: String,
     })
   }
 
-
   def replay(offset: Long): Unit = {
-    consumer.partitionsFor(topic) forEach { partition => {
-      val topicPartition = new TopicPartition(topic, partition.partition())
-      consumer.seek(topicPartition, offset)
-    }}
-    run()
+    println(s"Getting topic partitions for $topic - ${Thread.currentThread().getName} ${Thread.currentThread().getId}")
+    //shutdown()
+    consumer.synchronized {
+      consumer.partitionsFor(topic) forEach { partition => {
+        println(s"Partition $partition")
+        val topicPartition = new TopicPartition(topic, partition.partition())
+        println(s"Topic partition: $topicPartition")
+        consumer.seek(topicPartition, offset)
+      }}
+    }
+    //run()
   }
 
   def shutdown(): Unit = {
-    if (consumer != null)
-      consumer.close()
-    if (executor != null)
+    println("Shutting down")
+    consumer.synchronized {
+      if (consumer != null) {
+        println(s"Closing consumer - ${Thread.currentThread().getName} ${Thread.currentThread().getId}")
+        consumer.close()
+        // release
+      }
+    }
+    if (executor != null) {
+      println("Closing executor")
       executor.shutdown()
+    }
+    println("Shut down")
   }
 
   def createConsumerConfig(brokers: String, groupId: String, autoCommit: Boolean): Properties = {

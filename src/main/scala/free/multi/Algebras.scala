@@ -35,7 +35,7 @@ object Algebras {
   case class AddPaymentMethod(orderId: Id, entity: PaymentMethod) extends OrdersAlgebra[Stream[OrderEvent[PaymentGroup, PaymentMethod]]]
   case class AddPaymentAdress(orderId: Id, entity: Address) extends OrdersAlgebra[Stream[OrderEvent[PaymentGroup, Address]]]
   case class UnknownCommand(orderId: Id) extends OrdersAlgebra[Stream[OrderEvent[Order, Order]]]
-  case class Replay(id: Id, offset: Long, event: String) extends OrdersAlgebra[Unit]
+  case class Replay(id: Id, entity: ReplayMsg) extends OrdersAlgebra[Stream[OrderEvent[Order, Order]]]
 
   class Orders[F[_]](implicit i: InjectK[OrdersAlgebra, F]) {
     def createOrder(id: Id, entity: Order): Free[F, Stream[OrderEvent[Order, Order]]] =
@@ -53,8 +53,8 @@ object Algebras {
     def unknownCommand(id: Id): Free[F, Stream[OrderEvent[Order, Order]]] =
       Free.inject(UnknownCommand(id))
 
-    def replay(id: Id, offset: Long, event: String): Free[F, Unit] =
-      Free.inject(Replay(id, offset, event))
+    def replay(id: Id, entity: ReplayMsg): Free[F, Stream[OrderEvent[Order, Order]]] =
+      Free.inject(Replay(id, entity))
   }
   object Orders {
     implicit def reports[F[_]](implicit i: InjectK[OrdersAlgebra, F]): Orders[F] =

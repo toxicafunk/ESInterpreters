@@ -31,4 +31,6 @@ object models {
 
   case class Message[A <: BaseEntity](key: String, entity: A, command: String, timestamp: Long)
 
+  case class ReplayMsg(id: Id, offset: Long, event: String) extends BaseEntity
+
 }
