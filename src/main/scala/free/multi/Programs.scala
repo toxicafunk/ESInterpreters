@@ -21,8 +21,8 @@ object Programs {
 
   def processMessage[A <: BaseEntity](brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean)
                                      (implicit msgCtx: Messages[MessagingAndOrdersAlg],
-                                      ordersCtx: Orders[MessagingAndOrdersAlg]): Free[MessagingAndOrdersAlg, Stream[String]] = {
-    val jsonStream: Free[MessagingAndOrdersAlg, Stream[String]] = msgCtx.receiveMessage(brokers, topic, consumerGroup, autoCommit).flatMap {
+                                      ordersCtx: Orders[MessagingAndOrdersAlg]): Free[MessagingAndOrdersAlg, Stream[String]] =
+    msgCtx.receiveMessage(brokers, topic, consumerGroup, autoCommit).flatMap {
       case Stream.Empty => Free.pure(Stream.Empty)
       case Stream(message: String) => parse(message) match {
         case Left(error) => {
@@ -67,16 +67,10 @@ object Programs {
             eventStream.map(event => {
               val json = event.projection.asJson.noSpaces
               println(json)
+              msgCtx.sendMessage(brokers, topic + "View", json).flatMap(Free.pure(_))
               json
             })
           })
       }
     }
-
-    jsonStream.flatMap { str =>
-      str.flatMap(json =>
-        msgCtx.sendMessage(brokers, topic + "View", json).flatMap(() => Free.pure(json))
-      )
-    }
-  }
 }
