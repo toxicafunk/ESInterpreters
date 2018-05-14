@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{ExecutorService, Executors}
 import java.util.{Collections, Properties}
 
+import collection.JavaConverters._
 import org.apache.kafka.clients.consumer.{ConsumerConfig, ConsumerRecord, ConsumerRecords, KafkaConsumer}
 import org.apache.kafka.common.TopicPartition
 
@@ -42,27 +43,29 @@ class Consumer(val brokers: String,
 
   def replay(offset: Long): Unit = {
     println(s"Getting topic partitions for $topic - ${Thread.currentThread().getName} ${Thread.currentThread().getId}")
-    //shutdown()
     consumer.synchronized {
-      consumer.partitionsFor(topic) forEach { partition => {
-        println(s"Partition $partition")
-        val topicPartition = new TopicPartition(topic, partition.partition())
-        println(s"Topic partition: $topicPartition")
-        consumer.seek(topicPartition, offset)
+      val partitionInfos = asScalaBuffer(consumer.partitionsFor(topic)).toList
+      val topicPartitions = partitionInfos.map(partition => new TopicPartition(topic, partition.partition()))
+      println("Pausing consumer")
+      consumer.pause(asJavaCollection(topicPartitions))
+      topicPartitions foreach { partition => {
+        println(s"Topic partition: $partition")
+        consumer.seek(partition, offset)
       }}
+      consumer.resume(asJavaCollection(topicPartitions))
     }
-    //run()
   }
 
-  def shutdown(): Unit = {
-    println("Shutting down")
-    consumer.synchronized {
+  def close(): Unit = consumer.synchronized {
       if (consumer != null) {
         println(s"Closing consumer - ${Thread.currentThread().getName} ${Thread.currentThread().getId}")
         consumer.close()
-        // release
       }
     }
+
+  def shutdown(): Unit = {
+    println("Shutting down")
+    close()
     if (executor != null) {
       println("Closing executor")
       executor.shutdown()

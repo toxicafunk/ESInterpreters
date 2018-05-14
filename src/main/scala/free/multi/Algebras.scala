@@ -19,10 +19,15 @@ object Algebras {
     def receiveMessage(brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean): Free[F, Stream[String]] =
       Free.inject(ReceiveMessage(brokers, topic, consumerGroup, autoCommit))
 
-    def commit(): Free[F, Unit] = Free.inject(Commit())
+    def commit(): Free[F, Unit] = {
+      println("Injecting commit")
+      Free.inject(Commit())
+    }
 
-    def sendMessage(brokers: String, topic: String, message: String): Free[F, Unit] =
+    def sendMessage(brokers: String, topic: String, message: String): Free[F, Unit] = {
+      println("Injecting send!")
       Free.inject(SendMessage(brokers, topic, message))
+    }
   }
   object Messages {
     implicit def messages[F[_]](implicit i: InjectK[MessagingAlgebra, F]): Messages[F] =

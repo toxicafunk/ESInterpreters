@@ -21,7 +21,7 @@ object Programs {
 
   def processMessage[A <: BaseEntity](brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean)
                                      (implicit msgCtx: Messages[MessagingAndOrdersAlg],
-                                      ordersCtx: Orders[MessagingAndOrdersAlg]): Free[MessagingAndOrdersAlg, Stream[String]] =
+                                      ordersCtx: Orders[MessagingAndOrdersAlg]): Free[MessagingAndOrdersAlg, Stream[String]] = {
     msgCtx.receiveMessage(brokers, topic, consumerGroup, autoCommit).flatMap {
       case Stream.Empty => Free.pure(Stream.Empty)
       case Stream(message: String) => parse(message) match {
@@ -33,7 +33,7 @@ object Programs {
           val key = (json \\ "key").head.asString.get
           val cmd = (json \\ "command").head.asString.get
           val j: Json = json.\\("entity").head
-          val evts = cmd match {
+          val eventStream = cmd match {
             case "createOrder" =>
               val o = j.as[Order]
               ordersCtx.createOrder(key, o.right.get)
@@ -59,18 +59,18 @@ object Programs {
               ordersCtx.unknownCommand(key)
           }
 
+          if (!autoCommit) msgCtx.commit() else ()
+
           println("Stage 1 completed")
-          evts.map(eventStream => {
-            if (!autoCommit)
-              msgCtx.commit()
-            println(eventStream)
-            eventStream.map(event => {
-              val json = event.projection.asJson.noSpaces
-              println(json)
-              msgCtx.sendMessage(brokers, topic + "View", json).flatMap(Free.pure(_))
-              json
-            })
-          })
+
+          eventStream.map(stream => stream.map(event => {
+            val msg = event.projection.asJson.noSpaces
+            for {
+              _ <- msgCtx.sendMessage(brokers, s"${topic}View", msg)
+            } yield ()
+            msg
+          }))
       }
     }
+  }
 }
