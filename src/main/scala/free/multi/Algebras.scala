@@ -13,7 +13,7 @@ object Algebras {
   sealed trait MessagingAlgebra[T]
   case class ReceiveMessage(brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean) extends MessagingAlgebra[Stream[String]]
   case class Commit() extends MessagingAlgebra[Unit]
-  case class SendMessage(brokers: String, topic: String, message: String) extends MessagingAlgebra[Unit]
+  case class SendMessage(brokers: String, topic: String, message: String) extends MessagingAlgebra[String]
 
   class Messages[F[_]](implicit i: InjectK[MessagingAlgebra, F]) {
     def receiveMessage(brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean): Free[F, Stream[String]] =
@@ -24,7 +24,7 @@ object Algebras {
       Free.inject(Commit())
     }
 
-    def sendMessage(brokers: String, topic: String, message: String): Free[F, Unit] = {
+    def sendMessage(brokers: String, topic: String, message: String): Free[F, String] = {
       println("Injecting send!")
       Free.inject(SendMessage(brokers, topic, message))
     }

@@ -15,14 +15,14 @@ class Producer(val brokers: String) {
 
   val producer = new KafkaProducer[String, String](props)
 
-  def sendMessage(topic: String, key: String, message: String): Unit = {
+  def sendMessage(topic: String, key: String, message: String): String = {
     val data = new ProducerRecord[String, String](topic, key, message)
     //async
     //producer.send(data, (m,e) => {})
     //sync
     println(s"Sending: $data")
     producer.send(data)
-    ()
+    data.value
   }
 
   def shutdown(): Unit = {

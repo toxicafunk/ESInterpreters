@@ -23,6 +23,22 @@ object MultiInterpreters {
   val futureMessagingInterpreter = new (MessagingAlgebra ~> Future) {
 
     override def apply[A](fa: MessagingAlgebra[A]): Future[A] = fa match {
+
+      case Commit() => {
+        println("Committing")
+        /*_*/
+        Future.successful(consumerOpt.get.consumer.commitSync())
+        /*_*/
+      }
+
+      case SendMessage(brokers, topic, message) => {
+        println(s"SendMessage: $brokers - $topic - $message")
+        producerOpt = producerOpt.orElse(Some(new Producer(brokers)))
+        /*_*/
+        producerOpt.map(p => p.sendMessage(topic, "", message)).map(Future.successful).getOrElse(Future.successful("Error sending message"))
+        /*_*/
+      }
+
       case ReceiveMessage(brokers, topic, consumerGroup, autoCommit) => {
         consumerOpt = consumerOpt.orElse {
           val cons: Consumer = new Consumer(brokers, topic, consumerGroup, autoCommit)
@@ -31,18 +47,6 @@ object MultiInterpreters {
         }
 
         Future.successful(consumerOpt.map(c => c.atomicQueue.getAndSet(Queue.empty).toStream.map(_.value())).getOrElse(Stream.Empty))
-      }
-
-      /*_*/
-      case Commit() => Future.successful(consumerOpt.get.consumer.commitSync())
-      /*_*/
-
-      case SendMessage(brokers, topic, message) => {
-        println(s"SendMessage: $brokers - $topic - $message")
-        producerOpt = producerOpt.orElse(Some(new Producer(brokers)))
-        /*_*/
-        producerOpt.map(p => Future.successful(p.sendMessage(topic, "", message))).getOrElse(Future.unit)
-        /*_*/
       }
     }
   }

@@ -32,7 +32,8 @@ object Interpreters extends App {
 
       case SendMessage(brokers, topic, message) => {
         val producer = new Producer(brokers)
-        Future.successful(producer.sendMessage(topic, "", message))
+        val out = producer.sendMessage(topic, "", message)
+        Future.successful(out.asInstanceOf[A])
       }
     }
   }
