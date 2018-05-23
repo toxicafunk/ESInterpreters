@@ -11,7 +11,6 @@ import events._
 import free.multi.Algebras._
 import kafka.{Consumer, Producer}
 
-import scala.collection.mutable.Queue
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -39,15 +38,23 @@ object MultiInterpreters {
         /*_*/
       }
 
-      case ReceiveMessage(brokers, topic, consumerGroup, autoCommit) => {
+      case ReceiveMessage(brokers, topic, consumerGroup, autoCommit) =>
         consumerOpt = consumerOpt.orElse {
           val cons: Consumer = new Consumer(brokers, topic, consumerGroup, autoCommit)
           cons.run()
           Some(cons)
         }
 
-        Future.successful(consumerOpt.map(c => c.atomicQueue.getAndSet(Queue.empty).toStream.map(_.value())).getOrElse(Stream.Empty))
-      }
+        consumerOpt
+          .map(c => {
+            val q = c.atomicQueue.get()
+            if (q.isEmpty) ""
+            else q.dequeue().value()
+          })
+          .filter(s => !s.isEmpty)
+          .map(Future.successful(_))
+          .getOrElse(Future.never)
+
     }
   }
 
@@ -56,16 +63,12 @@ object MultiInterpreters {
     def currentTime: Long = Instant.now().toEpochMilli
 
     type OrderOrderEvent = OrderEvent[Order, Order]
-    type StreamOrderOrder = Stream[OrderOrderEvent]
 
     type CommerceItemEvent = OrderEvent[CommerceItem, Product]
-    type StreamCommerceItem = Stream[CommerceItemEvent]
 
     type PaymentGroupEvent = OrderEvent[PaymentGroup, PaymentMethod]
-    type StreamPaymentGroup = Stream[PaymentGroupEvent]
 
     type PaymentGroupAddressEvent = OrderEvent[PaymentGroup, Address]
-    type StreamPaymentGroupAddress = Stream[PaymentGroupAddressEvent]
 
     override def apply[A](fa: OrdersAlgebra[A]): Future[A] = fa match {
 
@@ -74,8 +77,8 @@ object MultiInterpreters {
 
         eventLog.put(id, event) match {
           /*_*/
-          case Left(err) => Future.successful(Stream(OrderUpdateFailed(id, order.some, order, err, currentTime)))
-          case Right(evt) => Future.successful(Stream(evt.asInstanceOf[OrderOrderEvent]))
+          case Left(err) => Future.successful(OrderUpdateFailed(id, order.some, order, err, currentTime))
+          case Right(evt) => Future.successful(evt.asInstanceOf[OrderOrderEvent])
           /*_*/
         }
       }
@@ -101,7 +104,7 @@ object MultiInterpreters {
         Future.successful(updatedEvents.map {
           case Left(err) => OrderUpdateFailed[CommerceItem, Product](id, None, product, err, currentTime)
           case Right(event) => event.asInstanceOf[CommerceItemEvent]
-        }.toStream)
+        }.toList)
         /*_*/
       }
 
@@ -116,14 +119,12 @@ object MultiInterpreters {
         val event = OrderPaymentGroupUpdated(orderId, paymentGroup.some, currentTime)
         println(event)
 
-
         eventLog.put(event.id, event) match {
           /*_*/
-          case Left(err) => Future.successful(Stream(OrderUpdateFailed[PaymentGroup, PaymentMethod](orderId, None, paymentMethod, err, currentTime)))
-          case Right(evt) => Future.successful(Stream(evt.asInstanceOf[PaymentGroupEvent]))
+          case Left(err) => Future.successful(OrderUpdateFailed[PaymentGroup, PaymentMethod](orderId, None, paymentMethod, err, currentTime))
+          case Right(evt) => Future.successful(evt.asInstanceOf[PaymentGroupEvent])
           /*_*/
         }
-
       }
 
       case AddPaymentAdress(orderId, address) => {
@@ -132,8 +133,8 @@ object MultiInterpreters {
 
         eventLog.put(event.id, event) match {
           /*_*/
-          case Left(err) => Future.successful(Stream(OrderUpdateFailed(orderId, None, address, err, currentTime)))
-          case Right(evt) => Future.successful(Stream(evt.asInstanceOf[PaymentGroupAddressEvent]))
+          case Left(err) => Future.successful(OrderUpdateFailed(orderId, None, address, err, currentTime))
+          case Right(evt) => Future.successful(evt.asInstanceOf[PaymentGroupAddressEvent])
           /*_*/
         }
 
@@ -145,13 +146,15 @@ object MultiInterpreters {
           println(s"Seeking offset ${replayMsg.offset}")
           c.replay(replayMsg.offset)
         })
-        Future.successful(Stream.empty)
+        Future.unit
       }
 
       case UnknownCommand(id) => {
-        println(s"Unknown command for $id");
+        val msg = s"Unknown command for $id"
+        println(msg);
+        val order = Order(id, List.empty, None)
         /*_*/
-        Future.successful(Stream.Empty)
+        Future.successful(OrderUpdateFailed(id, None, order, msg, currentTime))
         /*_*/
       }
     }
@@ -167,7 +170,7 @@ object MultiInterpreters {
     executor.execute(() => {
       println(s"Interpreter executing on thread ${Thread.currentThread().getName} ${Thread.currentThread().getId}")
       while (true) {
-        val result: Future[Stream[String]] =
+        val result: Future[String] =
           processMessage("192.168.99.100:9092", "test", "testers", false)
             .foldMap(futureMessagingOrReportInterpreter)
 

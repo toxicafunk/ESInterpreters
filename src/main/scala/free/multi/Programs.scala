@@ -1,6 +1,8 @@
 package free.multi
 
 import cats.free.Free
+import events.OrderEvent
+//import cats.syntax.all._
 import common.models._
 import free.multi.Algebras.{Messages, MessagingAndOrdersAlg, Orders}
 import io.circe.Json
@@ -19,46 +21,88 @@ object Programs {
     })
   }
 
-  def parseCommand(json: Json)(implicit ordersCtx: Orders[MessagingAndOrdersAlg]) = {
-    val key = (json \\ "key").head.asString.get
-    val command = (json \\ "command").head.asString.get
-    val j: Json = json.\\("entity").head
-    command match {
+  def parseOrder[F[_]](json: Json): Free[F, Order] = {
+    println(json)
+    val key = (json \\ "key").head.asString
+    val j = json.\\("entity").head
+    val command = (json \\ "command").head.noSpaces
+    println(s"key: $key, command: $command, j:\n $j")
+    val order = command match {
       case "createOrder" =>
-        val o = j.as[Order]
-        ordersCtx.createOrder(key, o.right.get)
-
-      case "addCommerceItem" => j.as[Product] match {
-        case Right(product) => ordersCtx.addCommerceItem(key, product, 0)
-        case Left(err) => println(err);
-          ordersCtx.unknownCommand(key)
-      }
-      case "addPaymentAddress" => j.as[Address] match {
-        case Right(address) => ordersCtx.addPaymentAddress(key, address)
-        case Left(err) => println(err);
-          ordersCtx.unknownCommand(key)
-      }
-      case "addPaymentGroup" => j.as[Credit] match {
-        case Right(paymentMethod) => ordersCtx.addPaymentGroup(key, paymentMethod)
-        case Left(err) => println(err);
-          ordersCtx.unknownCommand(key)
-      }
-      case "replay" => j.as[ReplayMsg] match {
-        case Right(replay) => ordersCtx.replay(key, replay)
-        case Left(err) => println(err);
-          ordersCtx.unknownCommand(key)
-      }
-      case _ =>
-        println("Unrecognized command")
-        ordersCtx.unknownCommand(key)
+        j.as[Order] match {
+          case Left(err) => { println(err); Order(key.getOrElse(err.message), List.empty, None) }
+          case Right(o1) => { println(o1); o1 }
+        }
     }
+    println(s"Order: $order")
+    Free.pure(order)
+  }
+
+  def handleCommand[F[_]](msg: String): Free[F, Json] = {
+    println(msg)
+    val j: Json = parse(msg) match {
+      case Left(err) => err.message.asJson
+      case Right(j) => j
+    }
+
+    Free.pure(j)
+  }
+
+
+  /*def join[F[_], A <: BaseEntity](orderStream: Stream[Order], ordersCtx: Orders[F]): Free[F, Stream[OrderEvent[Order, Order]]] = {
+    val tmp = orderStream.map(order => ordersCtx.createOrder(order.id, order))
+    val tmp1 = tmp.flatMap(free => free.mapK(FunctionK.id[F]))
+    tmp1
+  }*/
+
+  def join[F[_], A <: BaseEntity](order: Order, ordersCtx: Orders[F]): Free[F, OrderEvent[Order, Order]] = {
+    println(order)
+    ordersCtx.createOrder(order.id, order)
   }
 
   def processMessage[A <: BaseEntity](brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean)
                                      (implicit msgCtx: Messages[MessagingAndOrdersAlg],
-                                      ordersCtx: Orders[MessagingAndOrdersAlg]): Free[MessagingAndOrdersAlg, Stream[String]] = {
+                                      ordersCtx: Orders[MessagingAndOrdersAlg]): Free[MessagingAndOrdersAlg, String] =
+    for {
+      message <- msgCtx.receiveMessage(brokers, topic, consumerGroup, autoCommit)
+      json <- handleCommand[MessagingAndOrdersAlg](message)
+      order <- parseOrder[MessagingAndOrdersAlg](json)
+      event <- join[MessagingAndOrdersAlg, A](order, ordersCtx)
+    } yield event.projection.asJson.noSpaces
 
-    msgCtx.receiveMessage(brokers, topic, consumerGroup, autoCommit).flatMap {
+  /*case "addCommerceItem" => val product = j.as[Product] match {
+              case Left(err) => Product(err.getLocalizedMessage, err.message, None, "-99", Map.empty)
+              case Right(p) => p
+            }
+              for {
+                order <- ordersCtx.addCommerceItem(key, product, 0)
+              } yield order
+            case "addPaymentAddress" => val address = j.as[Address] match {
+              case Left(err) => Address(err.getLocalizedMessage, err.message, -1)
+              case Right(a) => a
+            }
+              for {
+                order <- ordersCtx.addPaymentAddress(key, address)
+              } yield order
+            case "addPaymentGroup" => val paymentMethod = j.as[Credit] match {
+              case Left(err) => Credit(err.getLocalizedMessage, err.message, "", None)
+              case Right(credit) => credit
+            }
+              for {
+                order <- ordersCtx.addPaymentGroup(key, paymentMethod)
+              } yield order
+            case "replay" => val replay = j.as[ReplayMsg] match {
+              case Left(err) => ReplayMsg(err.getLocalizedMessage, -1, err.message)
+              case Right(replayMsg) => replayMsg
+            }
+              for {
+                order <- ordersCtx.replay(key, replay)
+              } yield order
+            case _ => for {
+              order <- ordersCtx.unknownCommand(key)
+            } yield order*/
+
+  /*msgCtx.receiveMessage(brokers, topic, consumerGroup, autoCommit).flatMap {
       case Stream.Empty => Free.pure(Stream.Empty)
       case Stream(message: String) => parse(message) match {
         case Left(error) => {
@@ -77,6 +121,5 @@ object Programs {
           }))
         }
       }
-    }
-  }
+    }*/
 }
