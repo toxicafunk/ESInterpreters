@@ -23,6 +23,7 @@ object EventService {
         case ocu@OrderCommerceItemUpdated(_, _, _) => ocu.asJson
         case opu@OrderPaymentGroupUpdated(_, _, _) => opu.asJson
         case opa@OrderPaymentAddressUpdated(_,_,_) => opa.asJson
+        case _ => {}.asJson
       }.asJson
       Ok(jsons)
   }

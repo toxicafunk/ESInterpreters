@@ -1,7 +1,11 @@
 package free.multi
 
+import java.time.Instant
+
+import cats.implicits._
 import cats.free.Free
-import events.OrderEvent
+import common.models.{Input, Output}
+import events.{OrderCreated, OrderEvent, OrderUpdateFailed}
 //import cats.syntax.all._
 import common.models._
 import free.multi.Algebras.{Messages, MessagingAndOrdersAlg, Orders}
@@ -21,54 +25,85 @@ object Programs {
     })
   }
 
-  def parseOrder[F[_]](json: Json): Free[F, Order] = {
-    println(json)
-    val key = (json \\ "key").head.asString
-    val j = json.\\("entity").head
-    val command = (json \\ "command").head.noSpaces
-    println(s"key: $key, command: $command, j:\n $j")
-    val order = command match {
-      case "createOrder" =>
-        j.as[Order] match {
-          case Left(err) => { println(err); Order(key.getOrElse(err.message), List.empty, None) }
-          case Right(o1) => { println(o1); o1 }
+  def parseEntity[F[_]](jsonOpt: Option[Json]): Free[F, Option[Input]] = {
+    val entity = jsonOpt.map(json => {
+      val key = (json \\ "key").head.asString
+      val j = json.\\("entity").head
+      val command = (json \\ "command").head.asString.getOrElse("")
+      command match {
+        case "createOrder" =>
+          j.as[JsonOrder] match {
+            case Left(err) => JsonOrder(key.getOrElse(err.message), List.empty, None)
+            case Right(o1) => o1
+          }
+        case "addCommerceItem" => j.as[Product] match {
+          case Left(err) => Product(err.getLocalizedMessage, err.message, None, "-99", Map.empty)
+          case Right(p) => p
         }
-    }
-    println(s"Order: $order")
-    Free.pure(order)
+        case "addPaymentAddress" => j.as[Address] match {
+          case Left(err) => Address(err.getLocalizedMessage, err.message, -1)
+          case Right(a) => a
+        }
+        case "addPaymentGroup" => j.as[Credit] match {
+          case Left(err) => Credit(err.getLocalizedMessage, err.message, "", None)
+          case Right(credit) => credit
+        }
+        case "replay" => j.as[ReplayMsg] match {
+          case Left(err) => ReplayMsg(err.getLocalizedMessage, -1, err.message)
+          case Right(replayMsg) => replayMsg
+        }
+        case _ => JsonOrder("Unknown command", List.empty, None)
+      }
+    })
+    println(s"Order: $entity")
+    Free.pure(entity)
   }
 
-  def handleCommand[F[_]](msg: String): Free[F, Json] = {
-    println(msg)
-    val j: Json = parse(msg) match {
+  def handleCommand[F[_]](msg: Option[String]): Free[F, Option[Json]] = {
+    val j: Option[Json] = msg.map(m => parse(m) match {
       case Left(err) => err.message.asJson
       case Right(j) => j
-    }
+    })
 
     Free.pure(j)
   }
 
+  val currentTime = () => Instant.now().toEpochMilli
 
-  /*def join[F[_], A <: BaseEntity](orderStream: Stream[Order], ordersCtx: Orders[F]): Free[F, Stream[OrderEvent[Order, Order]]] = {
-    val tmp = orderStream.map(order => ordersCtx.createOrder(order.id, order))
-    val tmp1 = tmp.flatMap(free => free.mapK(FunctionK.id[F]))
-    tmp1
-  }*/
+  def testOpt[F[_]]: Free[F, Option[OrderEvent[Output]]] = Free.pure(OrderCreated("123", Order("234", List.empty[CommerceItem], None).some, currentTime()).some)
+  def test[F[_]]: Free[F, OrderEvent[Output]] = Free.pure(OrderCreated("123", Order("234", List.empty[CommerceItem], None).some, currentTime()))
+  //def test1[F[_]]: Free[F, OrderEvent[Output]] = Free.pure(OrderCreated("123", Order("234", List.empty[CommerceItem], None).some, currentTime()))
 
-  def join[F[_], A <: BaseEntity](order: Order, ordersCtx: Orders[F]): Free[F, OrderEvent[Order, Order]] = {
-    println(order)
-    ordersCtx.createOrder(order.id, order)
+
+  def join[F[_]](entityOpt: Option[Input], ordersCtx: Orders[F]): Option[Free[F,  OrderEvent[Output]]] = {
+    if (entityOpt.isEmpty) None
+    else {
+      val entity = entityOpt.get
+      val r = entity match {
+        case order@JsonOrder(id, _, _) => ordersCtx.createOrder(id, order).map(_.toOutput)
+        case address@Address(id, _, _) => ordersCtx.addPaymentAddress(id, address).map(_.toOutput)
+        case paymentMethod@Credit(id, _, _, _) => ordersCtx.addPaymentMethod(id, paymentMethod).map(_.toOutput)
+        case paymentMethod@PayPal(id, _, _, _) => ordersCtx.addPaymentMethod(id, paymentMethod).map(_.toOutput)
+        case product@Product(id, _, _, _, _) => ordersCtx.addCommerceItem(id, product.subProducts.get(id).get, product, 1).map(_.toOutput)
+        case _ => Free.pure[F, OrderEvent[Output]](failedEvent("Unknown command"))
+      }
+      r.some
+    }
   }
+
+  val failedEvent = (id:String) => OrderUpdateFailed[Input, Output](id, None, JsonOrder(id, List.empty, None),"Interpreter failed!", Instant.now().toEpochMilli)
 
   def processMessage[A <: BaseEntity](brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean)
                                      (implicit msgCtx: Messages[MessagingAndOrdersAlg],
-                                      ordersCtx: Orders[MessagingAndOrdersAlg]): Free[MessagingAndOrdersAlg, String] =
+                                      ordersCtx: Orders[MessagingAndOrdersAlg]): Free[MessagingAndOrdersAlg, Option[String]] =
     for {
       message <- msgCtx.receiveMessage(brokers, topic, consumerGroup, autoCommit)
+      //msg <- Free.liftF[MessagingAndOrdersAlg, Option[String]](message)
       json <- handleCommand[MessagingAndOrdersAlg](message)
-      order <- parseOrder[MessagingAndOrdersAlg](json)
-      event <- join[MessagingAndOrdersAlg, A](order, ordersCtx)
-    } yield event.projection.asJson.noSpaces
+      entity <- parseEntity[MessagingAndOrdersAlg](json)
+      event <- join[MessagingAndOrdersAlg](entity, ordersCtx)
+        .getOrElse(Free.pure[MessagingAndOrdersAlg, OrderEvent[Output]](failedEvent(entity.get.id)))
+    } yield event.projection.asJson.noSpaces.some
 
   /*case "addCommerceItem" => val product = j.as[Product] match {
               case Left(err) => Product(err.getLocalizedMessage, err.message, None, "-99", Map.empty)

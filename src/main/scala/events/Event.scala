@@ -3,16 +3,16 @@ package events
 import cats.implicits._
 import common.models._
 
-trait Event[A] {
+sealed trait Event[+A] {
   val at: Long
 }
 
-trait OrderEvent[A <: BaseEntity, B <: BaseEntity] extends Event[A] {
+sealed trait OrderEvent[+O <: Output] extends Event[O] {
   val id: Id
-  val entity: Option[A]
+  val entity: Option[O]
 
   def projection(implicit eventLog: EventStore[String]): Order = {
-    eventLog.get(id).foldRight(Order("", List.empty, None))((evt, order) => evt.asInstanceOf[OrderEvent[_, _]].entity match {
+    eventLog.get(id).foldRight(Order("", List.empty, None))((evt, order) => evt.asInstanceOf[OrderEvent[_]].entity match {
       case None => order
       case Some(enty) => enty match {
         case o@Order(_, _, _) => o
@@ -21,18 +21,20 @@ trait OrderEvent[A <: BaseEntity, B <: BaseEntity] extends Event[A] {
       }
     })
   }
+
+  val toOutput = this.asInstanceOf[OrderEvent[Output]]
 }
 
 case class OrderCreated(id: Id, entity: Option[Order], at: Long)
-  extends OrderEvent[Order, Order]
+  extends OrderEvent[Order]
 
 case class OrderCommerceItemUpdated(id: Id, entity: Option[CommerceItem], at: Long)
-  extends OrderEvent[CommerceItem,Product]
+  extends OrderEvent[CommerceItem]
 
 case class OrderPaymentGroupUpdated(id: Id, entity: Option[PaymentGroup], at: Long)
-  extends OrderEvent[PaymentGroup, PaymentMethod]
+  extends OrderEvent[PaymentGroup]
 
 case class OrderPaymentAddressUpdated(id: Id, entity: Option[PaymentGroup], at: Long)
-  extends OrderEvent[PaymentGroup, Address]
+  extends OrderEvent[PaymentGroup]
 
-case class OrderUpdateFailed[A <: BaseEntity, B <: BaseEntity](id: Id, entity: Option[A], baseEntity: B, message: String, at: Long) extends OrderEvent[A, B]
+case class OrderUpdateFailed[I <: Input, O <: Output](id: Id, entity: Option[O], baseEntity: I, message: String, at: Long) extends OrderEvent[O]

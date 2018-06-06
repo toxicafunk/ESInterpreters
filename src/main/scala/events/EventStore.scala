@@ -30,10 +30,10 @@ trait EventStore[K] {
   * In memory store
   */
 object InMemoryEventStore {
-  def apply[K] = new EventStore[K] {
-    val eventLog = TrieMap[K, List[Event[_]]]()
+  def apply[K]: EventStore[K] = new EventStore[K] {
+    val eventLog: TrieMap[K, List[Event[_]]] = TrieMap[K, List[Event[_]]]()
 
-    def get(key: K): List[Event[_]] = eventLog.get(key).getOrElse(List.empty[Event[_]])
+    def get(key: K): List[Event[_]] = eventLog.getOrElse(key, List.empty[Event[_]])
 
     def put(key: K, event: Event[_]): Either[Error, Event[_]] = {
       val currentList = eventLog.getOrElse(key, Nil)

@@ -21,6 +21,7 @@ object ProjectionService {
         case ocu@OrderCommerceItemUpdated(_, _, _) => ocu.projection.asJson
         case opu@OrderPaymentGroupUpdated(_, _, _) => opu.projection.asJson
         case opa@OrderPaymentAddressUpdated(_,_,_) => opa.projection.asJson
+        case _ => {}.asJson
       })
     }
   }

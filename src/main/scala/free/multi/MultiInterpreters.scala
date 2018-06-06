@@ -45,67 +45,64 @@ object MultiInterpreters {
           Some(cons)
         }
 
-        consumerOpt
-          .map(c => {
-            val q = c.atomicQueue.get()
-            if (q.isEmpty) ""
-            else q.dequeue().value()
-          })
-          .filter(s => !s.isEmpty)
-          .map(Future.successful(_))
-          .getOrElse(Future.never)
-
+        /*_*/
+        Future.successful {
+          consumerOpt
+            .map(c => {
+              val q = c.atomicQueue.get()
+              if (q.isEmpty) ""
+              else q.dequeue().value()
+            })
+            .filter(s => !s.isEmpty)
+        }
+        /*_*/
     }
   }
 
   val futureOrdersInterpreter = new (OrdersAlgebra ~> Future) {
 
-    def currentTime: Long = Instant.now().toEpochMilli
+    def failedEvent[O <: Output]: String => OrderEvent[O] = (id:String) => OrderUpdateFailed[Input, O](id, None, JsonOrder(id, List.empty, None),"Interpreter failed!", Instant.now().toEpochMilli)
 
-    type OrderOrderEvent = OrderEvent[Order, Order]
+    // def failedEvent[O <: Output]: String => OrderEvent[O] = (id: Id, in: Input, msg: String) => OrderUpdateFailed[Input, O](id, None, in, msg, currentTime())
 
-    type CommerceItemEvent = OrderEvent[CommerceItem, Product]
-
-    type PaymentGroupEvent = OrderEvent[PaymentGroup, PaymentMethod]
-
-    type PaymentGroupAddressEvent = OrderEvent[PaymentGroup, Address]
+    val currentTime = () => Instant.now().toEpochMilli
 
     override def apply[A](fa: OrdersAlgebra[A]): Future[A] = fa match {
 
-      case CreateOrder(id, order) => {
-        val event = OrderCreated(id, Order(id, List.empty, None).some, currentTime)
+      case CreateOrder(id, jsonOrder) =>
+        val event = OrderCreated(id, Order(jsonOrder.id, List.empty[CommerceItem], None).some, currentTime())
 
-        eventLog.put(id, event) match {
+        /*_*/
+        eventLog.put(id, event)
+          .bimap(
+            _ => failedEvent[Order](id),
+            evt => evt.asInstanceOf[OrderCreated]
+          )
+          .fold(fail => Future.successful(fail), success => Future.successful(success))
           /*_*/
-          case Left(err) => Future.successful(OrderUpdateFailed(id, order.some, order, err, currentTime))
-          case Right(evt) => Future.successful(evt.asInstanceOf[OrderOrderEvent])
-          /*_*/
-        }
-      }
 
-      case AddCommerceItem(id, product, qty@_) => {
+      case AddCommerceItem(id, subProduct, product, qty@_) => {
         val provider = RestClient.callProvider(product.providerId).unsafeRunSync()
         val section = provider.sections
           .filter(section => section.section == product.categoryId)
           .head
 
-        val updatedEvents: Iterable[Either[Error, Event[_]]] = product.subProducts.map(entry => {
-          val store = entry._2.platformId.map(p => {
-            println(p);
-            RestClient.callStore(p).unsafeRunSync()
-          })
-          val ciId = entry._1 + product.ean.getOrElse("")
-          val commerceItem = CommerceItem(ciId, store.map(_.tightFlowIndicator), section.hasLogisticMargin)
-          OrderCommerceItemUpdated(id, commerceItem.some, currentTime)
+        val store = subProduct.platformId.map(p => {
+          println(p);
+          RestClient.callStore(p).unsafeRunSync()
         })
-          .map(hpu => eventLog.put(hpu.id, hpu))
+        val ciId = subProduct.id + product.ean.getOrElse("")
+        val commerceItem = CommerceItem(ciId, store.map(_.tightFlowIndicator), section.hasLogisticMargin)
+        val ocu = OrderCommerceItemUpdated(id, commerceItem.some, currentTime())
+        /*_*/
+        eventLog.put(ocu.id, ocu)
+            .bimap(
+              _ => failedEvent[CommerceItem](id),
+              evt => evt.asInstanceOf[OrderCommerceItemUpdated]
+            )
 
-        /*_*/
-        Future.successful(updatedEvents.map {
-          case Left(err) => OrderUpdateFailed[CommerceItem, Product](id, None, product, err, currentTime)
-          case Right(event) => event.asInstanceOf[CommerceItemEvent]
-        }.toList)
-        /*_*/
+          .fold(fail => Future.successful(fail), success => Future.successful(success))
+         /*_*/
       }
 
       case AddPaymentMethod(orderId, paymentMethod) => {
@@ -116,27 +113,31 @@ object MultiInterpreters {
           case p@PayPal(_, _, _, _) => p
         }
         val paymentGroup = PaymentGroup(orderId, store.flatMap(_.logistic).getOrElse(""), None, method.some)
-        val event = OrderPaymentGroupUpdated(orderId, paymentGroup.some, currentTime)
+        val event = OrderPaymentGroupUpdated(orderId, paymentGroup.some, currentTime())
         println(event)
 
-        eventLog.put(event.id, event) match {
+        eventLog.put(event.id, event)
+          .bimap(
+            _ => failedEvent[PaymentGroup](orderId),
+            evt => evt.asInstanceOf[OrderPaymentGroupUpdated]
+          )
           /*_*/
-          case Left(err) => Future.successful(OrderUpdateFailed[PaymentGroup, PaymentMethod](orderId, None, paymentMethod, err, currentTime))
-          case Right(evt) => Future.successful(evt.asInstanceOf[PaymentGroupEvent])
+          .fold(fail => Future.successful(fail), success => Future.successful(success))
           /*_*/
-        }
       }
 
       case AddPaymentAdress(orderId, address) => {
         val paymentGroup = PaymentGroup(orderId, "", address.some, None)
-        val event = OrderPaymentAddressUpdated(orderId, paymentGroup.some, currentTime)
+        val event = OrderPaymentAddressUpdated(orderId, paymentGroup.some, currentTime())
 
-        eventLog.put(event.id, event) match {
+        eventLog.put(event.id, event)
+          .bimap(
+            err => failedEvent[PaymentGroup](orderId),
+            evt => evt.asInstanceOf[OrderPaymentAddressUpdated]
+          )
           /*_*/
-          case Left(err) => Future.successful(OrderUpdateFailed(orderId, None, address, err, currentTime))
-          case Right(evt) => Future.successful(evt.asInstanceOf[PaymentGroupAddressEvent])
+          .fold(fail => Future.successful(fail), success => Future.successful(success))
           /*_*/
-        }
 
       }
 
@@ -152,9 +153,8 @@ object MultiInterpreters {
       case UnknownCommand(id) => {
         val msg = s"Unknown command for $id"
         println(msg);
-        val order = Order(id, List.empty, None)
         /*_*/
-        Future.successful(OrderUpdateFailed(id, None, order, msg, currentTime))
+        Future.successful(failedEvent[Order](id))
         /*_*/
       }
     }
@@ -170,7 +170,7 @@ object MultiInterpreters {
     executor.execute(() => {
       println(s"Interpreter executing on thread ${Thread.currentThread().getName} ${Thread.currentThread().getId}")
       while (true) {
-        val result: Future[String] =
+        val result: Future[Option[String]] =
           processMessage("192.168.99.100:9092", "test", "testers", false)
             .foldMap(futureMessagingOrReportInterpreter)
 
