@@ -16,6 +16,7 @@ object ProjectionService {
   val service = HttpService[IO] {
     case GET -> Root / id => {
       println(s"id: $id")
+      // head is last event
       Ok(eventLog.get(id).head match {
         case oc@OrderCreated(_, _, _) => oc.projection.asJson
         case ocu@OrderCommerceItemUpdated(_, _, _) => ocu.projection.asJson

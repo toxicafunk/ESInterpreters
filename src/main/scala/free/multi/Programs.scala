@@ -55,7 +55,7 @@ object Programs {
         case _ => JsonOrder("Unknown command", List.empty, None)
       }
     })
-    println(s"Order: $entity")
+    //println(s"Order: $entity")
     Free.pure(entity)
   }
 
@@ -72,8 +72,6 @@ object Programs {
 
   def testOpt[F[_]]: Free[F, Option[OrderEvent[Output]]] = Free.pure(OrderCreated("123", Order("234", List.empty[CommerceItem], None).some, currentTime()).some)
   def test[F[_]]: Free[F, OrderEvent[Output]] = Free.pure(OrderCreated("123", Order("234", List.empty[CommerceItem], None).some, currentTime()))
-  //def test1[F[_]]: Free[F, OrderEvent[Output]] = Free.pure(OrderCreated("123", Order("234", List.empty[CommerceItem], None).some, currentTime()))
-
 
   def join[F[_]](entityOpt: Option[Input], ordersCtx: Orders[F]): Option[Free[F,  OrderEvent[Output]]] = {
     if (entityOpt.isEmpty) None
@@ -104,57 +102,4 @@ object Programs {
       event <- join[MessagingAndOrdersAlg](entity, ordersCtx)
         .getOrElse(Free.pure[MessagingAndOrdersAlg, OrderEvent[Output]](failedEvent(entity.get.id)))
     } yield event.projection.asJson.noSpaces.some
-
-  /*case "addCommerceItem" => val product = j.as[Product] match {
-              case Left(err) => Product(err.getLocalizedMessage, err.message, None, "-99", Map.empty)
-              case Right(p) => p
-            }
-              for {
-                order <- ordersCtx.addCommerceItem(key, product, 0)
-              } yield order
-            case "addPaymentAddress" => val address = j.as[Address] match {
-              case Left(err) => Address(err.getLocalizedMessage, err.message, -1)
-              case Right(a) => a
-            }
-              for {
-                order <- ordersCtx.addPaymentAddress(key, address)
-              } yield order
-            case "addPaymentGroup" => val paymentMethod = j.as[Credit] match {
-              case Left(err) => Credit(err.getLocalizedMessage, err.message, "", None)
-              case Right(credit) => credit
-            }
-              for {
-                order <- ordersCtx.addPaymentGroup(key, paymentMethod)
-              } yield order
-            case "replay" => val replay = j.as[ReplayMsg] match {
-              case Left(err) => ReplayMsg(err.getLocalizedMessage, -1, err.message)
-              case Right(replayMsg) => replayMsg
-            }
-              for {
-                order <- ordersCtx.replay(key, replay)
-              } yield order
-            case _ => for {
-              order <- ordersCtx.unknownCommand(key)
-            } yield order*/
-
-  /*msgCtx.receiveMessage(brokers, topic, consumerGroup, autoCommit).flatMap {
-      case Stream.Empty => Free.pure(Stream.Empty)
-      case Stream(message: String) => parse(message) match {
-        case Left(error) => {
-          println(error);
-          Free.pure(Stream.Empty)
-        }
-        case Right(json) => {
-          val eventStream = parseCommand(json)
-          if (!autoCommit) msgCtx.commit() else ()
-          eventStream.map(stream => stream.map(event => {
-            val msg = event.projection.asJson.noSpaces
-            val topicView = topic + "View"
-            println(s"$brokers - $topicView - $msg")
-            msgCtx.sendMessage(brokers, topicView, msg).flatMap(str => Free.pure(println(str)))
-            msg
-          }))
-        }
-      }
-    }*/
 }
