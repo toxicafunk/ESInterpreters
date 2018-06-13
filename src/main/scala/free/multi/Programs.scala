@@ -25,7 +25,7 @@ object Programs {
     })
   }
 
-  def parseEntity[F[_]](jsonOpt: Option[Json]): Free[F, Option[Input]] = {
+  def handleCommand[F[_]](jsonOpt: Option[Json]): Free[F, Option[Input]] = {
     val entity = jsonOpt.map(json => {
       val key = (json \\ "key").head.asString
       val j = json.\\("entity").head
@@ -59,12 +59,11 @@ object Programs {
     Free.pure(entity)
   }
 
-  def handleCommand[F[_]](msg: Option[String]): Free[F, Option[Json]] = {
+  def parseMessage[F[_]](msg: Option[String]): Free[F, Option[Json]] = {
     val j: Option[Json] = msg.map(m => parse(m) match {
       case Left(err) => err.message.asJson
       case Right(j) => j
     })
-
     Free.pure(j)
   }
 
@@ -73,7 +72,7 @@ object Programs {
   def testOpt[F[_]]: Free[F, Option[OrderEvent[Output]]] = Free.pure(OrderCreated("123", Order("234", List.empty[CommerceItem], None).some, currentTime()).some)
   def test[F[_]]: Free[F, OrderEvent[Output]] = Free.pure(OrderCreated("123", Order("234", List.empty[CommerceItem], None).some, currentTime()))
 
-  def join[F[_]](entityOpt: Option[Input], ordersCtx: Orders[F]): Option[Free[F,  OrderEvent[Output]]] = {
+  def createEvent[F[_]](entityOpt: Option[Input], ordersCtx: Orders[F]): Option[Free[F,  OrderEvent[Output]]] = {
     if (entityOpt.isEmpty) None
     else {
       val entity = entityOpt.get
@@ -91,15 +90,14 @@ object Programs {
 
   val failedEvent = (id:String) => OrderUpdateFailed[Input, Output](id, None, JsonOrder(id, List.empty, None),"Interpreter failed!", Instant.now().toEpochMilli)
 
-  def processMessage[A <: BaseEntity](brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean)
+  def processMessage(brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean)
                                      (implicit msgCtx: Messages[MessagingAndOrdersAlg],
                                       ordersCtx: Orders[MessagingAndOrdersAlg]): Free[MessagingAndOrdersAlg, Option[String]] =
     for {
       message <- msgCtx.receiveMessage(brokers, topic, consumerGroup, autoCommit)
-      //msg <- Free.liftF[MessagingAndOrdersAlg, Option[String]](message)
-      json <- handleCommand[MessagingAndOrdersAlg](message)
-      entity <- parseEntity[MessagingAndOrdersAlg](json)
-      event <- join[MessagingAndOrdersAlg](entity, ordersCtx)
+      json <- parseMessage[MessagingAndOrdersAlg](message)
+      entity <- handleCommand[MessagingAndOrdersAlg](json)
+      event <- createEvent[MessagingAndOrdersAlg](entity, ordersCtx)
         .getOrElse(Free.pure[MessagingAndOrdersAlg, OrderEvent[Output]](failedEvent(entity.get.id)))
     } yield event.projection.asJson.noSpaces.some
 }
