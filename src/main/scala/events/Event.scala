@@ -12,12 +12,14 @@ sealed trait OrderEvent[+O <: Output] extends Event[O] {
   val entity: Option[O]
 
   def projection(implicit eventLog: EventStore[String]): Order = {
-    eventLog.get(id).foldRight(Order("", List.empty, None))((evt, order) => evt.asInstanceOf[OrderEvent[_]].entity match {
+    eventLog.get(id).filter(evt => evt.at <= this.at).foldRight(Order("", List.empty, None))((evt, order) => evt.asInstanceOf[OrderEvent[_]].entity match {
       case None => order
       case Some(enty) => enty match {
         case o@Order(_, _, _) => o
         case c@CommerceItem(_, _, _) => order.copy(commerceItems = c +: order.commerceItems)
-        case p@PaymentGroup(_, _, _, _) => order.copy(paymentGroup = p.some)
+          // TODO: Use lenses
+        case p@PaymentGroup(_, _, address, None) => order.copy(paymentGroup = p.copy(address = address).some)
+        case p@PaymentGroup(_, _, None, paymentMethod) => order.copy(paymentGroup = p.copy(paymentMethod = paymentMethod).some)
       }
     })
   }

@@ -1,10 +1,13 @@
 package events
 
+import java.time.Instant
+
 import common.models.Error
 
 import scala.collection.concurrent.TrieMap
 
 trait EventStore[K] {
+  val id: String
   /**
     * gets the list of events for an aggregate key `key`
     */
@@ -26,6 +29,7 @@ trait EventStore[K] {
   def allEvents: Either[Error, List[Event[_]]]
 }
 
+
 /**
   * In memory store
   */
@@ -36,18 +40,21 @@ object InMemoryEventStore {
     def get(key: K): List[Event[_]] = eventLog.getOrElse(key, List.empty[Event[_]])
 
     def put(key: K, event: Event[_]): Either[Error, Event[_]] = {
-      val currentList = eventLog.getOrElse(key, Nil)
+      val currentList = eventLog.getOrElse(key, List())
       eventLog += (key -> (event :: currentList))
       Right(event)
     }
 
     def events(key: K): Either[Error, List[Event[_]]] = {
-      val currentList = eventLog.getOrElse(key, Nil)
+      val currentList = eventLog.getOrElse(key, List())
       if (currentList.isEmpty) Left(s"Aggregate $key does not exist")
       else Right(currentList)
     }
 
     def allEvents: Either[Error, List[Event[_]]] = Right(eventLog.values.toList.flatten)
+
+    override val id: String = Instant.now().toString
+
   }
 }
 

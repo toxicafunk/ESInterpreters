@@ -55,7 +55,7 @@ object Programs {
         case _ => JsonOrder("Unknown command", List.empty, None)
       }
     })
-    //println(s"Order: $entity")
+    //println(s"Entity: $entity")
     Free.pure(entity)
   }
 
@@ -72,16 +72,16 @@ object Programs {
   def testOpt[F[_]]: Free[F, Option[OrderEvent[Output]]] = Free.pure(OrderCreated("123", Order("234", List.empty[CommerceItem], None).some, currentTime()).some)
   def test[F[_]]: Free[F, OrderEvent[Output]] = Free.pure(OrderCreated("123", Order("234", List.empty[CommerceItem], None).some, currentTime()))
 
-  def createEvent[F[_]](entityOpt: Option[Input], ordersCtx: Orders[F]): Option[Free[F,  OrderEvent[Output]]] = {
+  def createEvent[F[_]](key: Option[String], entityOpt: Option[Input], ordersCtx: Orders[F]): Option[Free[F,  OrderEvent[Output]]] = {
     if (entityOpt.isEmpty) None
     else {
       val entity = entityOpt.get
       val r = entity match {
-        case order@JsonOrder(id, _, _) => ordersCtx.createOrder(id, order).map(_.toOutput)
-        case address@Address(id, _, _) => ordersCtx.addPaymentAddress(id, address).map(_.toOutput)
-        case paymentMethod@Credit(id, _, _, _) => ordersCtx.addPaymentMethod(id, paymentMethod).map(_.toOutput)
-        case paymentMethod@PayPal(id, _, _, _) => ordersCtx.addPaymentMethod(id, paymentMethod).map(_.toOutput)
-        case product@Product(id, _, _, _, _) => ordersCtx.addCommerceItem(id, product.subProducts.get(id).get, product, 1).map(_.toOutput)
+        case order@JsonOrder(id, _, _) => ordersCtx.createOrder(key.getOrElse(id), order).map(_.toOutput)
+        case address@Address(id, _, _) => ordersCtx.addPaymentAddress(key.getOrElse(id), address).map(_.toOutput)
+        case paymentMethod@Credit(id, _, _, _) => ordersCtx.addPaymentMethod(key.getOrElse(id), paymentMethod).map(_.toOutput)
+        case paymentMethod@PayPal(id, _, _, _) => ordersCtx.addPaymentMethod(key.getOrElse(id), paymentMethod).map(_.toOutput)
+        case product@Product(id, _, _, _, _) => ordersCtx.addCommerceItem(key.getOrElse(id), product.subProducts.toList.head._2, product, 1).map(_.toOutput)
         case _ => Free.pure[F, OrderEvent[Output]](failedEvent("Unknown command"))
       }
       r.some
@@ -96,8 +96,9 @@ object Programs {
     for {
       message <- msgCtx.receiveMessage(brokers, topic, consumerGroup, autoCommit)
       json <- parseMessage[MessagingAndOrdersAlg](message)
+      key = json.flatMap(j => (j \\ "key").head.asString)
       entity <- handleCommand[MessagingAndOrdersAlg](json)
-      event <- createEvent[MessagingAndOrdersAlg](entity, ordersCtx)
+      event <- createEvent[MessagingAndOrdersAlg](key, entity, ordersCtx)
         .getOrElse(Free.pure[MessagingAndOrdersAlg, OrderEvent[Output]](failedEvent(entity.get.id)))
     } yield event.projection.asJson.noSpaces.some
 }

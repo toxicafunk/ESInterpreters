@@ -16,8 +16,6 @@ object Data {
   val q: Queue[String] = Queue()
   val messages = List(createOrderMsg, addCommerceItemMsg, addPaymentGroupMsg, addPaymentAddressMsg)
 
-  val eventLog: EventStore[String] = InMemoryEventStore.apply[String]
-
   val futureTestingInterpreter = new (MessagingAlgebra ~> Future) {
 
     override def apply[A](fa: MessagingAlgebra[A]): Future[A] = fa match {

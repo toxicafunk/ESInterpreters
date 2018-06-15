@@ -71,7 +71,6 @@ object MultiInterpreters {
 
       case CreateOrder(id, jsonOrder) =>
         val event = OrderCreated(id, Order(jsonOrder.id, List.empty[CommerceItem], None).some, currentTime())
-
         /*_*/
         eventLog.put(id, event)
           .bimap(
@@ -88,7 +87,6 @@ object MultiInterpreters {
           .head
 
         val store = subProduct.platformId.map(p => {
-          println(p);
           RestClient.callStore(p).unsafeRunSync()
         })
         val ciId = subProduct.id + product.ean.getOrElse("")
@@ -107,14 +105,12 @@ object MultiInterpreters {
 
       case AddPaymentMethod(orderId, paymentMethod) => {
         val store = paymentMethod.platformId.map(RestClient.callStore(_).unsafeRunSync())
-        println(s"Store: $store")
         val method = paymentMethod match {
           case c@Credit(_, _, _, _) => c
           case p@PayPal(_, _, _, _) => p
         }
         val paymentGroup = PaymentGroup(orderId, store.flatMap(_.logistic).getOrElse(""), None, method.some)
         val event = OrderPaymentGroupUpdated(orderId, paymentGroup.some, currentTime())
-        println(event)
 
         eventLog.put(event.id, event)
           .bimap(
@@ -138,7 +134,6 @@ object MultiInterpreters {
           /*_*/
           .fold(fail => Future.successful(fail), success => Future.successful(success))
           /*_*/
-
       }
 
       case Replay(_, replayMsg) => {
