@@ -18,8 +18,14 @@ sealed trait OrderEvent[+O <: Output] extends Event[O] {
         case o@Order(_, _, _) => o
         case c@CommerceItem(_, _, _) => order.copy(commerceItems = c +: order.commerceItems)
           // TODO: Use lenses
-        case p@PaymentGroup(_, _, address, None) => order.copy(paymentGroup = p.copy(address = address).some)
-        case p@PaymentGroup(_, _, None, paymentMethod) => order.copy(paymentGroup = p.copy(paymentMethod = paymentMethod).some)
+        case p@PaymentGroup(_, _, address, None) => order.paymentGroup match {
+          case None => order.copy(paymentGroup = p.some)
+          case Some(pGroup) => order.copy(paymentGroup = pGroup.copy(address = address).some)
+        }
+        case p@PaymentGroup(_, _, None, paymentMethod) => order.paymentGroup match {
+          case None => order.copy(paymentGroup = p.some)
+          case Some(pGroup) => order.copy(paymentGroup = pGroup.copy(paymentMethod = paymentMethod).some)
+        }
       }
     })
   }
