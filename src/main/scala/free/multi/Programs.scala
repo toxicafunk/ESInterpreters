@@ -6,7 +6,6 @@ import cats.implicits._
 import cats.free.Free
 import common.models.{Input, Output}
 import events.{OrderCreated, OrderEvent, OrderUpdateFailed}
-//import cats.syntax.all._
 import common.models._
 import free.multi.Algebras.{Messages, MessagingAndOrdersAlg, Orders}
 import io.circe.Json
@@ -55,7 +54,6 @@ object Programs {
         case _ => JsonOrder("Unknown command", List.empty, None)
       }
     })
-    //println(s"Entity: $entity")
     Free.pure(entity)
   }
 
