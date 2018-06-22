@@ -2,7 +2,8 @@ package server
 
 import cats.effect.IO
 import cats.implicits._
-import free.multi.MultiInterpreters.futureMessagingOrReportInterpreter
+import free.multi.MultiInterpreters
+
 import free.multi.Programs.replay
 import org.http4s.HttpService
 import org.http4s.dsl.impl.Root
@@ -16,7 +17,7 @@ object ReplayService {
   val service = HttpService[IO] {
     case GET -> Root / offset => {
       println(s"offset: $offset")
-      val result: Future[String] = replay(offset.toLong).foldMap(futureMessagingOrReportInterpreter)
+      val result: Future[String] = replay(offset.toLong).foldMap(new MultiInterpreters(eventLog).futureMessagingOrReportInterpreter)
       val ioFut: IO[Future[String]] = IO(result)
       println(ioFut)
       Ok(IO.fromFuture(ioFut))

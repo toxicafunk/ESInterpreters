@@ -11,7 +11,7 @@ import scala.util.Properties.envOrNone
 
 object Server extends StreamApp[IO] {
   val port: Int = envOrNone("HTTP_PORT").fold(9090)(_.toInt)
-  MultiInterpreters.run()
+  new MultiInterpreters(eventLog).run()
   println(s"Starting server on port $port")
 
   override def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, ExitCode] =

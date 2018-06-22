@@ -8,8 +8,15 @@ import org.http4s.Uri
 import org.http4s.circe._
 import org.http4s.client.blaze._
 
+import scala.concurrent.duration._
+
 object RestClient {
-  val httpClient = Http1Client[IO]()
+  val longTimeoutConfig =
+    BlazeClientConfig
+      .defaultConfig
+      .copy(responseHeaderTimeout = 100.millis, idleTimeout = 200.millis)
+
+  val httpClient = Http1Client[IO](config = longTimeoutConfig)
 
   def callProvider[T](id: String): IO[Provider] = {
     val target = Uri.uri("http://localhost:8080/provider/") / id

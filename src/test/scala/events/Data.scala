@@ -1,8 +1,8 @@
 package events
 
 import cats.~>
-import free.multi.Algebras._
-import free.multi.MultiInterpreters.futureOrdersInterpreter
+import free.multi.algebras._
+import free.multi.interpreters.OrdersInterpreters
 
 import scala.collection.mutable.Queue
 import scala.concurrent.Future
@@ -33,9 +33,13 @@ object Data {
         println(s"Received: $msg")
         Future.successful(msg)
       /*_*/
+
+      case Replay(_, _) => Future.unit
     }
   }
 
-  val futureTestingOrReportInterpreter = futureTestingInterpreter or futureOrdersInterpreter
+  implicit val eventLog: EventStore[String] = InMemoryEventStore.apply[String]
+
+  val futureTestingOrReportInterpreter = futureTestingInterpreter or new OrdersInterpreters(eventLog).futureOrdersInterpreter
 
 }

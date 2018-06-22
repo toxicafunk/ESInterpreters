@@ -5,9 +5,10 @@ import java.time.Instant
 import cats.implicits._
 import cats.free.Free
 import common.models.{Input, Output}
-import events.{OrderCreated, OrderEvent, OrderUpdateFailed}
+import events.{EventStore, OrderCreated, OrderEvent, OrderUpdateFailed}
 import common.models._
-import free.multi.Algebras.{Messages, MessagingAndOrdersAlg, Orders}
+import free.multi.Algebras.MessagingAndOrdersAlg
+import free.multi.algebras._
 import io.circe.Json
 import io.circe.generic.auto._
 import io.circe.parser._
@@ -16,9 +17,9 @@ import io.circe.syntax._
 
 object Programs {
 
-  def replay(offset: Long)(implicit ordersCtx: Orders[MessagingAndOrdersAlg]): Free[MessagingAndOrdersAlg, String] = {
+  def replay(offset: Long)(implicit msgCtx: Messages[MessagingAndOrdersAlg]): Free[MessagingAndOrdersAlg, String] = {
     println("Replaying...")
-    ordersCtx.replay("", ReplayMsg("", offset, "")).flatMap(_ => {
+    msgCtx.replay("", ReplayMsg("", offset, "")).flatMap(_ => {
       println(s"Offset $offset")
       Free.pure(s"Replayed from offset $offset")
     })
@@ -90,7 +91,8 @@ object Programs {
 
   def processMessage(brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean)
                                      (implicit msgCtx: Messages[MessagingAndOrdersAlg],
-                                      ordersCtx: Orders[MessagingAndOrdersAlg]): Free[MessagingAndOrdersAlg, Option[String]] =
+                                      ordersCtx: Orders[MessagingAndOrdersAlg],
+                                      eventLog: EventStore[String]): Free[MessagingAndOrdersAlg, Option[String]] =
     for {
       message <- msgCtx.receiveMessage(brokers, topic, consumerGroup, autoCommit)
       json <- parseMessage[MessagingAndOrdersAlg](message)

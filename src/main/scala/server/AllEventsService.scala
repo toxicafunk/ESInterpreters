@@ -2,6 +2,7 @@ package server
 
 import cats.effect.IO
 import events._
+import free.multi.MultiInterpreters
 import io.circe.generic.auto._
 import io.circe.syntax._
 import org.http4s._
@@ -11,7 +12,7 @@ import org.http4s.dsl.io._
 
 object AllEventsService {
 
-  import free.multi.eventLog
+  new MultiInterpreters(eventLog)
 
   val service: HttpService[IO] = HttpService[IO] {
     case GET -> Root =>

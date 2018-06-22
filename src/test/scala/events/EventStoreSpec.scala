@@ -4,7 +4,6 @@ import cats.implicits._
 import common.models.Order
 import events.Data._
 import free.multi.Programs._
-import free.multi.eventLog
 import org.scalatest.Matchers._
 import org.scalatest._
 
@@ -25,9 +24,11 @@ class EventStoreSpec extends FlatSpec {
       Thread.sleep(500L)
     }
 
+    Thread.sleep(2000L)
+
     eventLog.events("O123").bimap(
-      err => println(err),
-      lst => lst.size shouldBe 4
+      err => { println(err); List.empty },
+      lst => {println(lst); lst.size shouldBe 4}
     )
 
     val orderedEvents = eventLog.get("O123").sortBy(_.at)
