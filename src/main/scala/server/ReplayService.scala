@@ -17,7 +17,7 @@ object ReplayService {
   val service = HttpService[IO] {
     case GET -> Root / offset => {
       println(s"offset: $offset")
-      val result: Future[String] = replay(offset.toLong).foldMap(new MultiInterpreters(eventLog).futureMessagingOrReportInterpreter)
+      val result: Future[String] = replay(offset.toLong).foldMap(new MultiInterpreters(eventLog).futureESOrMessagingOrReportInterpreter)
       val ioFut: IO[Future[String]] = IO(result)
       println(ioFut)
       Ok(IO.fromFuture(ioFut))

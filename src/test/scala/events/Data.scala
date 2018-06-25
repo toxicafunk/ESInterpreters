@@ -2,7 +2,7 @@ package events
 
 import cats.~>
 import free.multi.algebras._
-import free.multi.interpreters.OrdersInterpreters
+import free.multi.interpreters.{OrdersInterpreters, EventSourcingInterpreters}
 
 import scala.collection.mutable.Queue
 import scala.concurrent.Future
@@ -41,5 +41,8 @@ object Data {
   implicit val eventLog: EventStore[String] = InMemoryEventStore.apply[String]
 
   val futureTestingOrReportInterpreter = futureTestingInterpreter or new OrdersInterpreters(eventLog).futureOrdersInterpreter
+
+  val futureTestingESOrMessagingOrOrdersInterpreter =
+    new EventSourcingInterpreters().futureEventSourceInterpreter or futureTestingOrReportInterpreter
 
 }

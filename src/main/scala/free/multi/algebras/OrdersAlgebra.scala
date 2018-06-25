@@ -8,15 +8,15 @@ import free.multi.Id
 
 sealed trait OrdersAlgebra[+T]
 
-case class CreateOrder(id: Id, entity: JsonOrder) extends OrdersAlgebra[OrderEvent[Order]]
+final case class CreateOrder(id: Id, entity: JsonOrder) extends OrdersAlgebra[OrderEvent[Order]]
 
-case class AddCommerceItem(orderId: Id, entity: SubProduct, product: Product, qty: Int) extends OrdersAlgebra[OrderEvent[CommerceItem]]
+final case class AddCommerceItem(orderId: Id, entity: SubProduct, product: Product, qty: Int) extends OrdersAlgebra[OrderEvent[CommerceItem]]
 
-case class AddPaymentMethod(orderId: Id, entity: PaymentMethod) extends OrdersAlgebra[OrderEvent[PaymentGroup]]
+final case class AddPaymentMethod(orderId: Id, entity: PaymentMethod) extends OrdersAlgebra[OrderEvent[PaymentGroup]]
 
-case class AddPaymentAdress(orderId: Id, entity: Address) extends OrdersAlgebra[OrderEvent[PaymentGroup]]
+final case class AddPaymentAdress(orderId: Id, entity: Address) extends OrdersAlgebra[OrderEvent[PaymentGroup]]
 
-case class UnknownCommand(orderId: Id) extends OrdersAlgebra[OrderEvent[Order]]
+final case class UnknownCommand(orderId: Id) extends OrdersAlgebra[OrderEvent[Order]]
 
 class Orders[F[_]](implicit i: InjectK[OrdersAlgebra, F]) {
   def createOrder(id: Id, entity: JsonOrder): Free[F, OrderEvent[Order]] =

@@ -18,7 +18,7 @@ class EventStoreSpec extends FlatSpec {
       q.enqueue(msg)
       val result: Future[Option[String]] =
         processMessage("", "", "", false)
-          .foldMap(futureTestingOrReportInterpreter)
+          .foldMap(futureTestingESOrMessagingOrOrdersInterpreter)
 
       result.filter(_.nonEmpty).foreach(s => println(s"message processed: $s"))
       Thread.sleep(500L)

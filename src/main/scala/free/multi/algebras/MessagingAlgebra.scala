@@ -8,13 +8,13 @@ import free.multi.Id
 
 sealed trait MessagingAlgebra[T]
 
-case class ReceiveMessage(brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean) extends MessagingAlgebra[Option[String]]
+final case class ReceiveMessage(brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean) extends MessagingAlgebra[Option[String]]
 
-case class Commit() extends MessagingAlgebra[Unit]
+final case class Commit() extends MessagingAlgebra[Unit]
 
-case class SendMessage(brokers: String, topic: String, message: String) extends MessagingAlgebra[String]
+final case class SendMessage(brokers: String, topic: String, message: String) extends MessagingAlgebra[String]
 
-case class Replay(id: Id, entity: ReplayMsg) extends MessagingAlgebra[Unit]
+final case class Replay(id: Id, entity: ReplayMsg) extends MessagingAlgebra[Unit]
 
 class Messages[F[_]](implicit I: InjectK[MessagingAlgebra, F]) {
   def receiveMessage(brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean): Free[F, Option[String]] =
