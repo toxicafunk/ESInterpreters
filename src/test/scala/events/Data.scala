@@ -24,6 +24,7 @@ object Data {
 
       case SendMessage(brokers@_, topic@_, message@_) =>
         /*_*/
+        println(s"Publishing: $message")
         Future.successful(message)
         /*_*/
 
