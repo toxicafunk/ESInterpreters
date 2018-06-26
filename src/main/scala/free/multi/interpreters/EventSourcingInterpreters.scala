@@ -57,18 +57,6 @@ class EventSourcingInterpreters {
         }
         Future.successful(entity.some)
       }
-
-      /*case CreateEvent(key, entity, ordersCtx) => {
-        val currentTime = () => Instant.now().toEpochMilli
-        val r = entity match {
-          case order@JsonOrder(id, _, _) => ordersCtx.createOrder(key, order).map(_.toOutput)
-          case address@Address(id, _, _) => ordersCtx.addPaymentAddress(key, address).map(_.toOutput)
-          case paymentMethod@Credit(id, _, _, _) => ordersCtx.addPaymentMethod(key, paymentMethod).map(_.toOutput)
-          case paymentMethod@PayPal(id, _, _, _) => ordersCtx.addPaymentMethod(key, paymentMethod).map(_.toOutput)
-          case product@Product(id, _, _, _, _) => ordersCtx.addCommerceItem(key, product.subProducts.toList.head._2, product, 1).map(_.toOutput)
-          case _ => Free.pure[F, OrderEvent[Output]](failedEvent("Unknown command"))
-        }
-      }*/
     }
   }
 

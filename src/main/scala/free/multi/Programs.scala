@@ -21,28 +21,6 @@ object Programs {
       Free.pure(s"Replayed from offset $offset")
     })
   }
-/*
-  val currentTime = () => Instant.now().toEpochMilli
-
-  def testOpt[F[_]]: Free[F, Option[OrderEvent[Output]]] = Free.pure(OrderCreated("123", Order("234", List.empty[CommerceItem], None).some, currentTime()).some)
-  def test[F[_]]: Free[F, OrderEvent[Output]] = Free.pure(OrderCreated("123", Order("234", List.empty[CommerceItem], None).some, currentTime()))
-
-  def createEvent[F[_]](key: Option[String], entityOpt: Option[Input], ordersCtx: Orders[F]): Option[Free[F,  OrderEvent[Output]]] = {
-    if (entityOpt.isEmpty) None
-    else {
-      val entity = entityOpt.get
-      val r = entity match {
-        case order@JsonOrder(id, _, _) => ordersCtx.createOrder(key.getOrElse(id), order).map(_.toOutput)
-        case address@Address(id, _, _) => ordersCtx.addPaymentAddress(key.getOrElse(id), address).map(_.toOutput)
-        case paymentMethod@Credit(id, _, _, _) => ordersCtx.addPaymentMethod(key.getOrElse(id), paymentMethod).map(_.toOutput)
-        case paymentMethod@PayPal(id, _, _, _) => ordersCtx.addPaymentMethod(key.getOrElse(id), paymentMethod).map(_.toOutput)
-        case product@Product(id, _, _, _, _) => ordersCtx.addCommerceItem(key.getOrElse(id), product.subProducts.toList.head._2, product, 1).map(_.toOutput)
-        case _ => Free.pure[F, OrderEvent[Output]](failedEvent("Unknown command"))
-      }
-      r.some
-    }
-  }
-*/
 
   val failedEvent = (id:String) => OrderUpdateFailed[Input, Output](id, None, JsonOrder(id, List.empty, None),"Interpreter failed!", Instant.now().toEpochMilli)
 
