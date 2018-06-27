@@ -9,7 +9,7 @@ import scala.concurrent.Future
 
 object Data {
   val createOrderMsg =  """{"key": "O123", "command": "createOrder", "timestamp": 1523524766634, "entity": {"id":"O123", "commerceItems": []}}"""
-  val addCommerceItemMsg = """{"key": "O123", "command": "addCommerceItem", "timestamp": 1523524767634, "entity": {"id":"P123","categoryId":"01","ean": "890","providerId":"PR100","subProducts":{ "SP000": {"id":"SP000", "platformId": "abc01" }}}}"""
+  val addCommerceItemMsg = """{"key": "O123", "command": "addCommerceItem", "timestamp": 1523524767634, "entity": {"id":"P123","categoryId":"01","ean": "890","providerId":"PR100","subProducts":{ "SP000": {"id":"SP000", "platformId": "abc01" },"SP001": {"id":"SP001", "platformId": "abc02" }}}}"""
   val addPaymentGroupMsg = """{"key": "O123", "command": "addPaymentGroup", "timestamp": 1523524769634, "entity": {"id":"PG123","card":"visa","owner":"Eric Rodriguez","platformId":"99"}}"""
   val addPaymentAddressMsg = """{"key": "O123", "command": "addPaymentAddress", "timestamp": 1523524773634, "entity": {"id":"A123","street":"Calle Buena VIsta", "number": 11}}"""
 

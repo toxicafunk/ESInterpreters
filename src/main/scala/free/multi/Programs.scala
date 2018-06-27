@@ -3,7 +3,6 @@ package free.multi
 import java.time.Instant
 
 import cats.free.Free
-import cats.implicits._
 
 import common.models.{Input, Output, _}
 import events.{EventStore, OrderEvent, OrderUpdateFailed}
@@ -31,7 +30,7 @@ object Programs {
                                  (implicit msgCtx: Messages[MessagingAndOrdersAndESAlg],
                                       ordersCtx: Orders[MessagingAndOrdersAndESAlg],
                                       esCtx: EventSource[MessagingAndOrdersAndESAlg],
-                                      eventLog: EventStore[String]): Free[MessagingAndOrdersAndESAlg, Stream[Option[String]]] =
+                                      eventLog: EventStore[String]): Free[MessagingAndOrdersAndESAlg, Stream[String]] =
     for {
       message <- msgCtx.receiveMessage(brokers, topic, consumerGroup, autoCommit)
       json <- esCtx.parseMessage(message.getOrElse(""))
@@ -44,9 +43,9 @@ object Programs {
                 case paymentMethod@Credit(id, _, _, _) => ordersCtx.addPaymentMethod(key.getOrElse(id), paymentMethod).map(Stream(_))
                 case paymentMethod@PayPal(id, _, _, _) => ordersCtx.addPaymentMethod(key.getOrElse(id), paymentMethod).map(Stream(_))
                 case product@Product(id, _, _, _, _) => {
-                  val streamFree = product.subProducts.values.toStream.map { subProduct =>
-                    ordersCtx.addCommerceItem(key.getOrElse(id), subProduct, product, 1)
-                  }
+                  val streamFree = product.subProducts.values.toStream.map(
+                    subProduct => ordersCtx.addCommerceItem(key.getOrElse(id), subProduct, product, 1)
+                  )
                   streamSequence(streamFree)
                 }
                 case _ => Free.pure[MessagingAndOrdersAndESAlg, OrderEvent[Output]](failedEvent("Unknown command")).map(Stream(_))
@@ -57,5 +56,5 @@ object Programs {
         val res: Stream[Free[MessagingAndOrdersAndESAlg, String]] = eventStream.map(event => msgCtx.sendMessage(brokers, topic, event.projection.asJson.noSpaces))
         streamSequence(res)
       }
-    } yield out.some.sequence
+    } yield out
 }
