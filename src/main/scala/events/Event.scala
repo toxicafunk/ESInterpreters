@@ -29,8 +29,6 @@ sealed trait OrderEvent[+O <: Output] extends Event[O] {
       }
     })
   }
-
-  val toOutput = this.asInstanceOf[OrderEvent[Output]]
 }
 
 case class OrderCreated(id: Id, entity: Option[Order], at: Long)

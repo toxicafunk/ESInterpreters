@@ -4,6 +4,7 @@ import java.time.Instant
 
 import cats.free.Free
 import cats.implicits._
+
 import common.models.{Input, Output, _}
 import events.{EventStore, OrderEvent, OrderUpdateFailed}
 import free.multi.Algebras.MessagingAndOrdersAndESAlg
@@ -24,28 +25,37 @@ object Programs {
 
   val failedEvent = (id:String) => OrderUpdateFailed[Input, Output](id, None, JsonOrder(id, List.empty, None),"Interpreter failed!", Instant.now().toEpochMilli)
 
+  type FreeMsgEvents[O <: Output] = Free[MessagingAndOrdersAndESAlg, OrderEvent[O]]
+
   def processMessage(brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean)
-                                     (implicit msgCtx: Messages[MessagingAndOrdersAndESAlg],
+                                 (implicit msgCtx: Messages[MessagingAndOrdersAndESAlg],
                                       ordersCtx: Orders[MessagingAndOrdersAndESAlg],
                                       esCtx: EventSource[MessagingAndOrdersAndESAlg],
-                                      eventLog: EventStore[String]): Free[MessagingAndOrdersAndESAlg, Option[String]] =
+                                      eventLog: EventStore[String]): Free[MessagingAndOrdersAndESAlg, Stream[Option[String]]] =
     for {
       message <- msgCtx.receiveMessage(brokers, topic, consumerGroup, autoCommit)
       json <- esCtx.parseMessage(message.getOrElse(""))
       key = json.flatMap(j => (j \\ "key").head.asString)
       entity <- esCtx.handleCommand(json.getOrElse({}.asJson))
-      event <- entity match {
+      eventStream <- entity match {
               case Some(e) => e match {
-                case order@JsonOrder(id, _, _) => ordersCtx.createOrder(key.getOrElse(id), order).map(_.toOutput)
-                case address@Address(id, _, _) => ordersCtx.addPaymentAddress(key.getOrElse(id), address).map(_.toOutput)
-                case paymentMethod@Credit(id, _, _, _) => ordersCtx.addPaymentMethod(key.getOrElse(id), paymentMethod).map(_.toOutput)
-                case paymentMethod@PayPal(id, _, _, _) => ordersCtx.addPaymentMethod(key.getOrElse(id), paymentMethod).map(_.toOutput)
-                case product@Product(id, _, _, _, _) => ordersCtx.addCommerceItem(key.getOrElse(id), product.subProducts.toList.head._2, product, 1).map(_.toOutput)
-                case _ => Free.pure[MessagingAndOrdersAndESAlg, OrderEvent[Output]](failedEvent("Unknown command"))
+                case order@JsonOrder(id, _, _) => ordersCtx.createOrder(key.getOrElse(id), order).map(Stream(_))
+                case address@Address(id, _, _) => ordersCtx.addPaymentAddress(key.getOrElse(id), address).map(Stream(_))
+                case paymentMethod@Credit(id, _, _, _) => ordersCtx.addPaymentMethod(key.getOrElse(id), paymentMethod).map(Stream(_))
+                case paymentMethod@PayPal(id, _, _, _) => ordersCtx.addPaymentMethod(key.getOrElse(id), paymentMethod).map(Stream(_))
+                case product@Product(id, _, _, _, _) => {
+                  val streamFree = product.subProducts.values.toStream.map { subProduct =>
+                    ordersCtx.addCommerceItem(key.getOrElse(id), subProduct, product, 1)
+                  }
+                  streamSequence(streamFree)
+                }
+                case _ => Free.pure[MessagingAndOrdersAndESAlg, OrderEvent[Output]](failedEvent("Unknown command")).map(Stream(_))
               }
-              case None => Free.pure[MessagingAndOrdersAndESAlg, OrderEvent[Output]](failedEvent("Unknown command"))
+              case None => Free.pure[MessagingAndOrdersAndESAlg, OrderEvent[Output]](failedEvent("Unknown command")).map(Stream(_))
             }
-      out = event.projection.asJson.noSpaces
-      _ <- msgCtx.sendMessage(brokers, topic, out)
-    } yield out.some
+      out <- {
+        val res: Stream[Free[MessagingAndOrdersAndESAlg, String]] = eventStream.map(event => msgCtx.sendMessage(brokers, topic, event.projection.asJson.noSpaces))
+        streamSequence(res)
+      }
+    } yield out.some.sequence
 }

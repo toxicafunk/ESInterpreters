@@ -16,7 +16,7 @@ class EventStoreSpec extends FlatSpec {
   "EvenStore" should "have the four events needed to create an order" in {
     messages.foreach { msg =>
       q.enqueue(msg)
-      val result: Future[Option[String]] =
+      val result: Future[Stream[Option[String]]] =
         processMessage("", "", "", false)
           .foldMap(futureTestingESOrMessagingOrOrdersInterpreter)
 

@@ -27,7 +27,7 @@ class MultiInterpreters(val eventLog: EventStore[String]) {
       import free.multi.algebras.EventSource.eventsource
       println(s"Interpreter executing on thread ${Thread.currentThread().getName} ${Thread.currentThread().getId}")
       while (true) {
-        val result: Future[Option[String]] =
+        val result: Future[Stream[Option[String]]] =
           processMessage("192.168.99.100:9092", "test", "testers", false)(messages, reports, eventsource, eventLog)
             .foldMap(futureESOrMessagingOrReportInterpreter)
 
