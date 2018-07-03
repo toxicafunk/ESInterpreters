@@ -8,11 +8,14 @@ package object multi {
 
   import scala.language.higherKinds
 
-  def streamTraverse[F[_] : Applicative, A, B](stream: Stream[A])(func: A => F[B]): F[Stream[B]] =
-    stream.foldLeft(Stream.empty[B].pure[F]) { (accum, item) =>
-      (accum, func(item)).mapN(_ :+ _)
-    }
+  implicit final class StreamOps[F[_]: Applicative, B](val stream: Stream[F[B]]) {
 
-  def streamSequence[F[_] : Applicative, B](stream: Stream[F[B]]): F[Stream[B]] =
-    streamTraverse(stream)(identity)
+    def streamTraverse[A](stream: Stream[A])(f: A => F[B]): F[Stream[B]] =
+      stream.foldLeft(Stream.empty[B].pure[F]) { (accum, item) =>
+        (accum, f(item)).mapN(_ :+ _)
+      }
+
+    def streamSequence: F[Stream[B]] =
+      streamTraverse(stream)(identity)
+  }
 }

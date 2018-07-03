@@ -46,7 +46,7 @@ object Programs {
                   val streamFree = product.subProducts.values.toStream.map(
                     subProduct => ordersCtx.addCommerceItem(key.getOrElse(id), subProduct, product, 1)
                   )
-                  streamSequence(streamFree)
+                  streamFree.streamSequence
                 }
                 case _ => Free.pure[MessagingAndOrdersAndESAlg, OrderEvent[Output]](failedEvent("Unknown command")).map(Stream(_))
               }
@@ -54,7 +54,7 @@ object Programs {
             }
       out <- {
         val res: Stream[Free[MessagingAndOrdersAndESAlg, String]] = eventStream.map(event => msgCtx.sendMessage(brokers, topic, event.projection.asJson.noSpaces))
-        streamSequence(res)
+        res.streamSequence
       }
     } yield out
 }

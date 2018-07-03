@@ -25,12 +25,14 @@ class EventStoreSpec extends FlatSpec {
     }
 
     Thread.sleep(2000L)
+    println("\nFinished processing messages!\n")
 
     eventLog.events("O123").bimap(
       err => { println(err); List.empty },
-      lst => {println(lst); lst.size shouldBe 5}
+      lst => lst.size shouldBe 5
     )
 
+    println("Printing events for O123")
     val orderedEvents = eventLog.get("O123").sortBy(_.at)
     orderedEvents.foreach(evt => println(evt.asInstanceOf[OrderEvent[Order]].projection))
   }
