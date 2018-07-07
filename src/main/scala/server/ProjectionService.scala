@@ -15,7 +15,7 @@ object ProjectionService {
 
   new MultiInterpreters(eventLog)
 
-  val service = HttpService[IO] {
+  val service = (interpreters: MultiInterpreters) => HttpService[IO] {
     case GET -> Root / id => {
       println(s"id: $id")
       // head is last event

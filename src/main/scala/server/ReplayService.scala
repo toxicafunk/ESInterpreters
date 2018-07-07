@@ -14,10 +14,10 @@ import scala.concurrent.Future
 
 object ReplayService {
 
-  val service = HttpService[IO] {
+  val service = (interpreters: MultiInterpreters) => HttpService[IO] {
     case GET -> Root / offset => {
       println(s"offset: $offset")
-      val result: Future[String] = replay(offset.toLong).foldMap(new MultiInterpreters(eventLog).futureESOrMessagingOrReportInterpreter)
+      val result: Future[String] = replay(offset.toLong).foldMap(interpreters.futureESOrMessagingOrReportInterpreter)
       val ioFut: IO[Future[String]] = IO(result)
       println(ioFut)
       Ok(IO.fromFuture(ioFut))

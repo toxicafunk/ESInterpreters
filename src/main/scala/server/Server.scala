@@ -11,16 +11,18 @@ import scala.util.Properties.envOrNone
 
 object Server extends StreamApp[IO] {
   val port: Int = envOrNone("HTTP_PORT").fold(9090)(_.toInt)
-  new MultiInterpreters(eventLog).run()
   println(s"Starting server on port $port")
 
-  override def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, ExitCode] =
+  override def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, ExitCode] = {
+    val interpreter = new MultiInterpreters(eventLog)
+    interpreter.run()
     BlazeBuilder[IO]
       .bindHttp(port)
       .mountService(StaticService.service, "/")
-      .mountService(EventService.service, "/events")
-      .mountService(AllEventsService.service, "/allevents")
-      .mountService(ProjectionService.service, "/projection")
-      .mountService(ReplayService.service, "/replay")
+      .mountService(EventService.service(interpreter), "/events")
+      .mountService(AllEventsService.service(interpreter), "/allevents")
+      .mountService(ProjectionService.service(interpreter), "/projection")
+      .mountService(ReplayService.service(interpreter), "/replay")
       .serve
+  }
 }

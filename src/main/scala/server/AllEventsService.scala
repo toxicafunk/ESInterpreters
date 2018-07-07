@@ -12,9 +12,8 @@ import org.http4s.dsl.io._
 
 object AllEventsService {
 
-  new MultiInterpreters(eventLog)
 
-  val service: HttpService[IO] = HttpService[IO] {
+  val service = (interpreters: MultiInterpreters) => HttpService[IO] {
     case GET -> Root =>
       val events = eventLog.allEvents
       println(events)
