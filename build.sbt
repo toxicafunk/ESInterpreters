@@ -3,6 +3,7 @@ name := "ESInterpreters"
 version := "0.1"
 
 scalaVersion := "2.12.5"
+scalaVersion in ThisBuild := "2.12.5"
 
 val circeVersion = "0.9.3"
 val http4sVersion = "0.18.7"

@@ -2,35 +2,30 @@ package free.multi
 
 import java.time.Instant
 
-import cats.free.Free
+import cats.Monad
 
 import common.models.{Input, Output, _}
 import events.{EventStore, OrderEvent, OrderUpdateFailed}
-import free.multi.Algebras.MessagingAndOrdersAndESAlg
 import free.multi.algebras._
 import io.circe.generic.auto._
 import io.circe.syntax._
 
 
-object Programs {
+class Programs[F[_]: Monad](msgCtx: MessagingAlgebra[F], ordersCtx: OrdersAlgebra[F], esCtx: EventSourcingAlgebra[F]) {
 
-  def replay(offset: Long)(implicit msgCtx: Messages[MessagingAndOrdersAndESAlg]): Free[MessagingAndOrdersAndESAlg, String] = {
+  /*def replay(offset: Long)(implicit msgCtx: Messages[MessagingAndOrdersAndESAlg]): Free[MessagingAndOrdersAndESAlg, String] = {
     println("Replaying...")
     msgCtx.replay("", ReplayMsg("", offset, "")).flatMap(_ => {
       println(s"Offset $offset")
       Free.pure(s"Replayed from offset $offset")
     })
-  }
+  }*/
 
   val failedEvent = (id:String) => OrderUpdateFailed[Input, Output](id, None, JsonOrder(id, List.empty, None),"Interpreter failed!", Instant.now().toEpochMilli)
 
-  type FreeMsgEvents[O <: Output] = Free[MessagingAndOrdersAndESAlg, OrderEvent[O]]
 
   def processMessage(brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean)
-                                 (implicit msgCtx: Messages[MessagingAndOrdersAndESAlg],
-                                      ordersCtx: Orders[MessagingAndOrdersAndESAlg],
-                                      esCtx: EventSource[MessagingAndOrdersAndESAlg],
-                                      eventLog: EventStore[String]): Free[MessagingAndOrdersAndESAlg, Stream[String]] =
+                    (implicit eventLog: EventStore[String]): F[Stream[String]] =
     for {
       message <- msgCtx.receiveMessage(brokers, topic, consumerGroup, autoCommit)
       json <- esCtx.parseMessage(message.getOrElse(""))
@@ -48,12 +43,12 @@ object Programs {
                   )
                   streamFree.streamSequence
                 }
-                case _ => Free.pure[MessagingAndOrdersAndESAlg, OrderEvent[Output]](failedEvent("Unknown command")).map(Stream(_))
+                case _ => implicitly[Monad[F]].pure(failedEvent("Unknown command")).map(Stream(_))
               }
-              case None => Free.pure[MessagingAndOrdersAndESAlg, OrderEvent[Output]](failedEvent("Unknown command")).map(Stream(_))
+              case None => implicitly[Monad[F]].pure(failedEvent("Unknown command")).map(Stream(_))
             }
       out <- {
-        val res: Stream[Free[MessagingAndOrdersAndESAlg, String]] = eventStream.map(event => msgCtx.sendMessage(brokers, topic, event.projection.asJson.noSpaces))
+        val res: Stream[F[String]] = eventStream.map(event => msgCtx.sendMessage(brokers, topic, event.projection.asJson.noSpaces))
         res.streamSequence
       }
     } yield out
