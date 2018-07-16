@@ -2,7 +2,8 @@ package free.multi
 
 import java.util.concurrent.{ExecutorService, Executors}
 
-import cats.implicits._
+import cats.instances.future._
+
 import events._
 import free.multi.interpreters._
 

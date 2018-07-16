@@ -1,7 +1,7 @@
 package events
 
 import cats.syntax.either._
-import cats.implicits._
+import cats.instances.future._
 import common.models.Order
 import events.Data._
 import free.multi.Programs
