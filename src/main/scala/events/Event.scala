@@ -8,7 +8,7 @@ sealed trait Event[+A] {
 }
 
 sealed trait OrderEvent[+O <: Output] extends Event[O] {
-  val id: Id
+  val id: UUID
   val entity: Option[O]
 }
 
@@ -37,16 +37,16 @@ object OrderEvent {
 
 }
 
-case class OrderCreated(id: Id, entity: Option[Order], at: Long)
+case class OrderCreated(id: UUID, entity: Option[Order], at: Long)
   extends OrderEvent[Order]
 
-case class OrderCommerceItemUpdated(id: Id, entity: Option[CommerceItem], at: Long)
+case class OrderCommerceItemUpdated(id: UUID, entity: Option[CommerceItem], at: Long)
   extends OrderEvent[CommerceItem]
 
-case class OrderPaymentGroupUpdated(id: Id, entity: Option[PaymentGroup], at: Long)
+case class OrderPaymentGroupUpdated(id: UUID, entity: Option[PaymentGroup], at: Long)
   extends OrderEvent[PaymentGroup]
 
-case class OrderPaymentAddressUpdated(id: Id, entity: Option[PaymentGroup], at: Long)
+case class OrderPaymentAddressUpdated(id: UUID, entity: Option[PaymentGroup], at: Long)
   extends OrderEvent[PaymentGroup]
 
-case class OrderUpdateFailed[I <: Input, O <: Output](id: Id, entity: Option[O], baseEntity: I, message: String, at: Long) extends OrderEvent[O]
+case class OrderUpdateFailed[I <: Input, O <: Output](id: UUID, entity: Option[O], baseEntity: I, message: String, at: Long) extends OrderEvent[O]

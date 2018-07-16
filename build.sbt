@@ -10,6 +10,7 @@ val http4sVersion = "0.18.7"
 
 libraryDependencies ++= Seq(
   "org.typelevel" %% "cats-free" % "1.0.1",
+  "org.typelevel" %% "cats-mtl-core" % "0.0.2",
   "org.scalatest" %% "scalatest" % "3.0.1" % Test,
 
   "org.apache.kafka" % "kafka-clients" % "1.1.0",

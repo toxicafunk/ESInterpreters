@@ -4,7 +4,7 @@ import common.models._
 import events.OrderEvent
 import free.multi.Id
 
-sealed trait OrdersAlgebra[F[_]] {
+trait OrdersAlgebra[F[_]] {
   def createOrder(id: Id, entity: JsonOrder): F[OrderEvent[Order]]
   def addCommerceItem(orderId: Id, entity: SubProduct, product: Product, qty: Int): F[OrderEvent[CommerceItem]]
   def addPaymentMethod(orderId: Id, entity: PaymentMethod): F[OrderEvent[PaymentGroup]]

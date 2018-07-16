@@ -1,11 +1,11 @@
 package events
 
-import cats.~>
+import common.models
+import common.models.UUID
+import events.Data.q
 import free.multi.algebras._
-import free.multi.interpreters.{OrdersInterpreters, EventSourcingInterpreters}
 
 import scala.collection.mutable.Queue
-import scala.concurrent.Future
 
 object Data {
   val createOrderMsg =  """{"key": "O123", "command": "createOrder", "timestamp": 1523524766634, "entity": {"id":"O123", "commerceItems": []}}"""
@@ -16,34 +16,26 @@ object Data {
   val q: Queue[String] = Queue()
   val messages = List(createOrderMsg, addCommerceItemMsg, addPaymentGroupMsg, addPaymentAddressMsg)
 
-  val futureTestingInterpreter = new (MessagingAlgebra ~> Future) {
-
-    override def apply[A](fa: MessagingAlgebra[A]): Future[A] = fa match {
-
-      case Commit() => /*_*/ Future.unit /*_*/
-
-      case SendMessage(brokers@_, topic@_, message@_) =>
-        /*_*/
-        println(s"Publishing: $message")
-        Future.successful(message)
-        /*_*/
-
-      case ReceiveMessage(brokers@_, topic@_, consumerGroup@_, autoCommit@_) =>
-        /*_*/
-        val msg = Some(q.dequeue())
-        println(s"Received: $msg")
-        Future.successful(msg)
-      /*_*/
-
-      case Replay(_, _) => Future.unit
-    }
-  }
-
   implicit val eventLog: EventStore[String] = InMemoryEventStore.apply[String]
 
-  val futureTestingOrReportInterpreter = futureTestingInterpreter or new OrdersInterpreters(eventLog).futureOrdersInterpreter
+}
 
-  val futureTestingESOrMessagingOrOrdersInterpreter =
-    new EventSourcingInterpreters().futureEventSourceInterpreter or futureTestingOrReportInterpreter
+import scala.concurrent.Future
 
+trait TestingInterpreter extends MessagingAlgebra[Future] {
+
+  override def commit(): Future[Unit] = Future.unit
+
+  override def sendMessage(brokers: String, topic: String, message: String): Future[String] = {
+    println(s"Publishing: $message")
+    Future.successful(message)
+  }
+
+  override def receiveMessage(brokers: String, topic: String, consumerGroup: String, autoCommit: Boolean): Future[Option[String]] = {
+    val msg = Some(q.dequeue())
+    println(s"Received: $msg")
+    Future.successful(msg)
+  }
+
+  override def replay(id: UUID, entity: models.ReplayMsg): Future[String] = Future.successful("Replayed!")
 }
