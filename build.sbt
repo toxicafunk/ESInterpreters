@@ -31,6 +31,14 @@ libraryDependencies ++= Seq(
   "io.circe" %% "circe-literal"
 ).map(_ % circeVersion)
 
+libraryDependencies ++= Seq(
+  "nl.grons" %% "metrics4-scala" % "4.0.1",
+  "io.dropwizard.metrics" % "metrics-jmx" % "4.1.0-rc2"
+)
+
+//scalacOptions += "-Yrangepos"
+//addCompilerPlugin(scalafixSemanticdb)
+
 scalacOptions ++= Seq(
   //"-Xfatal-warnings",
   "-Ypartial-unification",

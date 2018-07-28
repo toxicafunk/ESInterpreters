@@ -49,7 +49,7 @@ class Programs[F[_] : Monad](msgCtx: MessagingAlgebra[F], ordersCtx: OrdersAlgeb
         case None => implicitly[Monad[F]].pure(failedEvent("Unknown command")).map(Stream(_))
       }
       out <- {
-        val res: Stream[F[String]] = eventStream.map(event => msgCtx.sendMessage(brokers, topic, event.projection.asJson.noSpaces))
+        val res: Stream[F[String]] = eventStream.map(event => msgCtx.sendMessage(brokers, topic + "Out", event.projection.asJson.noSpaces))
         res.streamSequence
       }
     } yield out
