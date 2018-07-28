@@ -5,7 +5,6 @@ import java.time.Instant
 import cats.Monad
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-
 import common.models.{Input, Output, _}
 import events.{EventStore, OrderUpdateFailed}
 import free.multi.algebras._
@@ -49,7 +48,10 @@ class Programs[F[_] : Monad](msgCtx: MessagingAlgebra[F], ordersCtx: OrdersAlgeb
         case None => implicitly[Monad[F]].pure(failedEvent("Unknown command")).map(Stream(_))
       }
       out <- {
-        val res: Stream[F[String]] = eventStream.map(event => msgCtx.sendMessage(brokers, topic + "Out", event.projection.asJson.noSpaces))
+        val res: Stream[F[String]] =
+          /*_*/
+          eventStream.map(event => msgCtx.sendMessage(brokers, topic + "Out", event.projection.asJson.noSpaces))
+          /*_*/
         res.streamSequence
       }
     } yield out
