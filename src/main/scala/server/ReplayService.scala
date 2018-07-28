@@ -3,6 +3,7 @@ package server
 import cats.effect.IO
 import common.models.ReplayMsg
 import free.multi.MultiInterpreters
+import nl.grons.metrics4.scala.Counter
 import org.http4s.HttpService
 import org.http4s.dsl.impl.Root
 import org.http4s.dsl.io._
@@ -11,13 +12,11 @@ import scala.concurrent.Future
 
 object ReplayService {
 
-  val service = (interpreters: MultiInterpreters) => HttpService[IO] {
+  val service = (interpreters: MultiInterpreters, counter: Counter) => HttpService[IO] {
     case GET -> Root / offset => {
-      println(s"offset: $offset")
+      counter += 1
       val result: Future[String] = interpreters.futureMessagingInterpreter.replay("", ReplayMsg("", offset.toLong, ""))
-      val ioFut: IO[Future[String]] = IO(result)
-      println(ioFut)
-      Ok(IO.fromFuture(ioFut))
+      Ok(IO.fromFuture(IO(result)))
     }
   }
 }

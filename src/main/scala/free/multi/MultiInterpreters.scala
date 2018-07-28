@@ -24,7 +24,7 @@ class MultiInterpreters(val eventStore: EventStore[String]) {
       println(s"Interpreter executing on thread ${Thread.currentThread().getName} ${Thread.currentThread().getId}")
       while (true) {
         val result: Future[Stream[String]] = new Programs(futureMessagingInterpreter, futureOrdersInterpreter, futureeEventSourcingInterpreter)
-          .processMessage("172.18.0.2:9092", "test", "testers", false)(eventStore)
+          .processMessage("172.18.0.3:9092", "test", "metrics", false)(eventStore)
 
         result.filter(_.nonEmpty).foreach(s => println(s"message processed: $s"))
         Thread.sleep(2000L)

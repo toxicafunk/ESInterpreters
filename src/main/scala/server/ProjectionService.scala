@@ -6,6 +6,7 @@ import events._
 import free.multi.MultiInterpreters
 import io.circe.generic.auto._
 import io.circe.syntax._
+import nl.grons.metrics4.scala.{Meter, Timer}
 import org.http4s._
 import org.http4s.circe._
 import org.http4s.dsl.impl.Root
@@ -15,11 +16,13 @@ object ProjectionService {
 
   new MultiInterpreters(eventLog)
 
-  val service = (interpreters: MultiInterpreters) => HttpService[IO] {
+  val service = (interpreters: MultiInterpreters, timer: Timer, meter: Meter) => HttpService[IO] {
     case GET -> Root / id => {
-      println(s"id: $id")
-      // head is last event
-      Ok(eventLog.get(id).head.asInstanceOf[OrderEvent[Order]].projection.asJson)
+      meter.mark()
+      timer.time {
+        // head is last event
+        Ok(eventLog.get(id).head.asInstanceOf[OrderEvent[Order]].projection.asJson)
+      }
     }
   }
 }

@@ -27,10 +27,14 @@ object Server extends StreamApp[IO] with nl.grons.metrics4.scala.DefaultInstrume
     BlazeBuilder[IO]
       .bindHttp(port)
       .mountService(StaticService.service, "/")
-      .mountService(EventService.service(interpreter, metrics), "/events")
+      .mountService(EventService.service(interpreter, metrics.histogram("events-result")), "/events")
       .mountService(AllEventsService.service(interpreter), "/allevents")
-      .mountService(ProjectionService.service(interpreter), "/projection")
-      .mountService(ReplayService.service(interpreter), "/replay")
+      .mountService(ProjectionService.service(
+        interpreter,
+        metrics.timer("projection"),
+        metrics.meter("getRequests", "requests")
+      ), "/projection")
+      .mountService(ReplayService.service(interpreter, metrics.counter("replays")), "/replay")
       .serve
   }
 }
